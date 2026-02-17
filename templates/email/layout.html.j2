@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta
+      name="format-detection"
+      content="telephone=no,address=no,email=no,date=no,url=no"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>{% block title %}lnkr{% endblock %}</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    "
+  >
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      style="background-color: #1e1e2e;"
+    >
+      <tr>
+        <td style="padding: 20px 0">
+          <table
+            role="presentation"
+            align="center"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="width: 100%; max-width: 600px"
+          >
+            <tr>
+              <td
+                style="
+                  text-align: center;
+                  padding: 40px 20px 30px;
+                  color: #b4befe;
+                  font-size: 24px;
+                  font-weight: 600;
+                "
+              >
+                lnkr
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                style="
+                  padding: 20px 40px;
+                  color: #cdd6f4;
+                  line-height: 1.6;
+                "
+              >
+                {% block content %}{% endblock %}
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                style="
+                  padding: 30px 40px;
+                  text-align: center;
+                  color: #bac2de;
+                  font-size: 14px;
+                "
+              >
+                <a
+                  href="https://lnkr.by"
+                  style="
+                    color: #89b4fa;
+                    text-decoration: none;
+                    font-weight: 600;
+                  "
+                  >lnkr.by</a
+                >
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

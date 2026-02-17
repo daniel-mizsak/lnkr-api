@@ -27,13 +27,10 @@ jobs:
 
   ci:
     permissions:
-      contents: read # checkout
-      actions: write # upload-artifact
-      id-token: write # codecov-action
+      contents: read
+      actions: write
+      id-token: write
     uses: daniel-mizsak/workflows/.github/workflows/python-ci.yml@v1
     with:
-      python-version: "3.12"
       coverage: true
       codecov: true
-      documentation: true
-      package: true

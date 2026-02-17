@@ -1,0 +1,81 @@
+---
+services:
+  lnkr-api:
+    image: ghcr.io/daniel-mizsak/lnkr-api:latest
+    networks:
+      - traefik
+      - postgres
+      - redis
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.services.lnkr-api.loadbalancer.server.port=8000"
+
+        # General rate limiting
+        - "traefik.http.routers.lnkr-general.rule=Host(`api.lnkr.by`)"
+        - "traefik.http.routers.lnkr-general.entrypoints=websecure"
+        - "traefik.http.routers.lnkr-general.priority=10"
+        - "traefik.http.routers.lnkr-general.middlewares=lnkr-general-ratelimit"
+
+        - "traefik.http.middlewares.lnkr-general-ratelimit.ratelimit.average=60"
+        - "traefik.http.middlewares.lnkr-general-ratelimit.ratelimit.burst=120"
+        - "traefik.http.middlewares.lnkr-general-ratelimit.ratelimit.period=1m"
+
+        # Auth rate limiting
+        - "traefik.http.routers.lnkr-auth.rule=Host(`api.lnkr.by`) && PathPrefix(`/v1/auth`)"
+        - "traefik.http.routers.lnkr-auth.entrypoints=websecure"
+        - "traefik.http.routers.lnkr-auth.priority=20"
+        - "traefik.http.routers.lnkr-auth.middlewares=lnkr-auth-ratelimit"
+
+        - "traefik.http.middlewares.lnkr-auth-ratelimit.ratelimit.average=6"
+        - "traefik.http.middlewares.lnkr-auth-ratelimit.ratelimit.burst=12"
+        - "traefik.http.middlewares.lnkr-auth-ratelimit.ratelimit.period=1m"
+
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 15s
+        order: start-first
+        failure_action: rollback
+        monitor: 10s
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 1G
+
+    environment:
+      ENVIRONMENT: "${ENVIRONMENT}"
+      ACCESS_TOKEN_SECRET_KEY: "${ACCESS_TOKEN_SECRET_KEY}"
+      SENTRY_DSN: "${SENTRY_DSN}"
+
+      POSTGRES_HOST: "${POSTGRES_HOST}"
+      POSTGRES_PORT: "${POSTGRES_PORT}"
+      POSTGRES_USERNAME: "${APPLICATION_NAME}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DATABASE: "${APPLICATION_NAME}"
+
+      REDIS_HOST: "${REDIS_HOST}"
+      REDIS_PORT: "${REDIS_PORT}"
+      REDIS_USERNAME: "${REDIS_USERNAME}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+
+      SMTP_HOST: "${SMTP_HOST}"
+      SMTP_PORT: "${SMTP_PORT}"
+      SMTP_USER: "${SMTP_USER}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD}"
+
+networks:
+  traefik:
+    external: true
+  postgres:
+    external: true
+  redis:
+    external: true
