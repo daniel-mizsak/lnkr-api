@@ -5,34 +5,39 @@
 
 # Project Metadata
 [project]
-  name = "python-package-template-pypi" # Name has to be unique on pypi.
-  version = "0.3.1"
-  description = "Python package template configuration."
-  readme = "README.md"
-  license = { file = "LICENSE" }
+  name = "lnkr-api"
+  version = "0.1.0"
+  description = "Link manager REST API."
   authors = [{ name = "Daniel Mizsak", email = "info@pythonvilag.hu" }]
-  keywords = ["python", "template", "package", "github", "pypi"]
-  classifiers = [
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
+  requires-python = ">=3.14"
+  dependencies = [
+    "PyJWT==2.11.0",
+    "fastapi[standard]==0.129.0",
+    "psycopg2-binary==2.9.11",
+    "pydantic-settings==2.12.0",
+    "redis==7.1.1",
+    "sentry-sdk==2.52.0",
+    "sqlmodel==0.0.33",
   ]
-  requires-python = ">=3.12"
-  dependencies = ["numpy==2.4.2"]
 
   [project.urls]
-    Repository = "https://github.com/daniel-mizsak/python-package-template/"
-    Documentation = "https://daniel-mizsak.github.io/python-package-template/"
-    Issues = "https://github.com/daniel-mizsak/python-package-template/issues/"
+    Homepage = "https://api.lnkr.by"
+    Repository = "https://github.com/daniel-mizsak/lnkr-api"
 
 [dependency-groups]
-  dev = ["coverage", "nox", "pre-commit", "pytest", "ruff", "ty"]
-  docs = ["zensical", "mkdocstrings-python"]
+  dev = [
+    "beautifulsoup4",
+    "coverage",
+    "fakeredis",
+    "pre-commit",
+    "pytest",
+    "ruff",
+    "ty",
+  ]
+  deployment = ["ansible"]
 
 # Tools
 # Uv
 [tool.uv.build-backend]
   module-root = "src"
-  module-name = "python_package_template"
+  module-name = "lnkr"

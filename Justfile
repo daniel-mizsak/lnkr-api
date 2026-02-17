@@ -1,13 +1,15 @@
+set shell := ["bash", "-uc"]
+
 @_:
     just --list --unsorted
 
 [group("lifecycle")]
 clean:
     rm -rf \
+        .ansible \
         .artifacts \
         .cache \
         .coverage \
-        .nox \
         .pytest_cache \
         .ruff_cache \
         coverage.xml \
@@ -39,24 +41,23 @@ type:
 
 [group("qa")]
 test *args:
+    source ./deployment/.env.development && \
     uv run pytest {{ args }}
 
 [group("qa")]
-test-all-python:
-    uv run nox
-
-[group("qa")]
 coverage:
+    source ./deployment/.env.development && \
     uv run coverage run --source=tests --module pytest
     uv run coverage report --fail-under=100 --show-missing
 
-    uv run coverage run --source=python_package_template --module pytest
+    source ./deployment/.env.development && \
+    uv run coverage run --source=lnkr --module pytest
     uv run coverage report --show-missing
     uv run coverage xml -o .artifacts/coverage.xml
     uv run coverage html -d .artifacts/htmlcov
 
 [group("qa")]
-check-all: lint type test-all-python coverage
+check-all: lint type coverage
 
 [group("qa-extra")]
 megalinter:
@@ -66,17 +67,15 @@ megalinter:
 pre-commit:
     uv run pre-commit run --all-files
 
-[group("build")]
-build-documentation:
-    uv run zensical build --clean --strict
+[group("deploy")]
+[working-directory("./deployment")]
+deploy-development up="up":
+    source ./.env.development && \
+    docker compose --file compose.development.yml {{ up }} \
+    {{ if up == "up" { " --build --watch" } else { "" } }}
 
-[group("build")]
-build-package:
-    uv build --out-dir .artifacts/dist
-
-[group("build")]
-build-all: build-documentation build-package
-
-[group("serve")]
-serve-documentation:
-    uv run zensical serve --open
+[confirm("Deploy to production? (y/N)")]
+[group("deploy")]
+[working-directory("./deployment")]
+deploy-production:
+    op run --env-file=".env.production" --no-masking -- ansible-playbook playbook.yml

@@ -1,5 +1,12 @@
 # Project
-deployment/inventory.ini
+.github
+deployment
+tests
+.pre-commit-config.yaml
+Justfile
+LICENSE
+README.md
+ruff.toml
 
 # System
 .DS_Store

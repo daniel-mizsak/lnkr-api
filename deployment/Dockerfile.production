@@ -1,0 +1,55 @@
+# Documentation:
+#   - https://docs.astral.sh/uv/guides/integration/docker/
+#   - https://hynek.me/articles/docker-uv/
+
+FROM python:3.14 AS build
+
+ENV LANG=C.UTF-8
+ENV TZ=Europe/Copenhagen
+
+WORKDIR /src
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=0 \
+    UV_NO_DEV=1 \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
+
+COPY . /src
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-editable
+
+FROM python:3.14-slim
+
+LABEL maintainer="Daniel Mizsak"
+LABEL org.opencontainers.image.source="https://github.com/daniel-mizsak/lnkr-api"
+
+ENV LANG=C.UTF-8
+ENV TZ=Europe/Copenhagen
+
+WORKDIR /app
+
+RUN groupadd --system --gid 65532 nonroot && \
+    useradd --system --uid 65532 --gid 65532 --shell /usr/sbin/nologin nonroot
+
+COPY --chown=nonroot:nonroot asgi.py /app/asgi.py
+COPY --chown=nonroot:nonroot templates /app/templates
+COPY --chown=nonroot:nonroot --from=build /app/.venv /app/.venv
+
+ENV ENVIRONMENT=production
+ENV PATH="/app/.venv/bin:$PATH"
+
+COPY --chown=nonroot:nonroot healthcheck.py /app/healthcheck.py
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD ["python", "/app/healthcheck.py"]
+
+USER nonroot
+EXPOSE 8000
+CMD ["uvicorn", "asgi:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,77 @@
+---
+services:
+  lnkr-api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.development
+    develop:
+      watch:
+        - path: ../src
+          action: sync
+          target: /app/src
+        - path: ../templates
+          action: sync
+          target: /app/templates
+        - path: ../pyproject.toml
+          action: rebuild
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - mailpit
+    environment:
+      ENVIRONMENT: "${ENVIRONMENT}"
+      ACCESS_TOKEN_SECRET_KEY: "${ACCESS_TOKEN_SECRET_KEY}"
+
+      POSTGRES_HOST: "${POSTGRES_HOST}"
+      POSTGRES_USERNAME: "${POSTGRES_USERNAME}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DATABASE: "${POSTGRES_DATABASE}"
+
+      REDIS_HOST: "${REDIS_HOST}"
+      REDIS_USERNAME: "${REDIS_USERNAME}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+
+      SMTP_HOST: "${SMTP_HOST}"
+      SMTP_PORT: "${SMTP_PORT}"
+      SMTP_USER: "${SMTP_USER}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD}"
+
+  postgres:
+    image: postgres:18.1
+    container_name: postgres
+    user: postgres
+    shm_size: "256mb"
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+
+  adminer:
+    image: adminer:5.4.1
+    container_name: adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: "postgres"
+
+  redis:
+    image: redis:8.4.0
+    container_name: redis
+    command:
+      - redis-server
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+
+  mailpit:
+    image: axllent/mailpit:v1.29.0
+    container_name: mailpit
+    ports:
+      - "8025:8025"
+    command:
+      - --smtp-auth-allow-insecure
+    environment:
+      MP_SMTP_AUTH: "${SMTP_USER}:${SMTP_PASSWORD}"

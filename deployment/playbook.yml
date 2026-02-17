@@ -1,0 +1,70 @@
+---
+- name: Deploy application
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    application_name: "lnkr-api"
+
+  tasks:
+    - name: Create postgres application user
+      community.postgresql.postgresql_user:
+        name: "{{ application_name }}"
+        password: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+        login_host: "127.0.0.1"
+        login_port: "5432"
+        login_user: "postgres"
+        login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+        state: present
+
+    - name: Create postgres application database
+      community.postgresql.postgresql_db:
+        name: "{{ application_name }}"
+        owner: "{{ application_name }}"
+        login_host: "127.0.0.1"
+        login_port: "5432"
+        login_user: "postgres"
+        login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+        state: present
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: /deploy/applications/{{ application_name }}
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+        state: directory
+
+    - name: Copy application to host
+      ansible.builtin.copy:
+        src: compose.production.yml
+        dest: /deploy/applications/{{ application_name }}/compose.yml
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Start application
+      community.docker.docker_stack:
+        name: "{{ application_name }}"
+        compose:
+          - /deploy/applications/{{ application_name }}/compose.yml
+        state: present
+      environment:
+        APPLICATION_NAME: "{{ application_name }}"
+        ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
+        ACCESS_TOKEN_SECRET_KEY: "{{ lookup('env', 'ACCESS_TOKEN_SECRET_KEY') }}"
+        SENTRY_DSN: "{{ lookup('env', 'SENTRY_DSN') }}"
+
+        POSTGRES_HOST: "{{ lookup('env', 'POSTGRES_HOST') }}"
+        POSTGRES_PORT: "{{ lookup('env', 'POSTGRES_PORT') }}"
+        POSTGRES_PASSWORD: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+
+        REDIS_HOST: "{{ lookup('env', 'REDIS_HOST') }}"
+        REDIS_PORT: "{{ lookup('env', 'REDIS_PORT') }}"
+        REDIS_USERNAME: "{{ lookup('env', 'REDIS_USERNAME') }}"
+        REDIS_PASSWORD: "{{ lookup('env', 'REDIS_PASSWORD') }}"
+
+        SMTP_HOST: "{{ lookup('env', 'SMTP_HOST') }}"
+        SMTP_PORT: "{{ lookup('env', 'SMTP_PORT') }}"
+        SMTP_USER: "{{ lookup('env', 'SMTP_USER') }}"
+        SMTP_PASSWORD: "{{ lookup('env', 'SMTP_PASSWORD') }}"
