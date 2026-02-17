@@ -1,0 +1,38 @@
+# Build System
+[build-system]
+  requires = ["uv_build"]
+  build-backend = "uv_build"
+
+# Project Metadata
+[project]
+  name = "python-package-template-pypi" # Name has to be unique on pypi.
+  version = "0.3.1"
+  description = "Python package template configuration."
+  readme = "README.md"
+  license = { file = "LICENSE" }
+  authors = [{ name = "Daniel Mizsak", email = "info@pythonvilag.hu" }]
+  keywords = ["python", "template", "package", "github", "pypi"]
+  classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+  ]
+  requires-python = ">=3.12"
+  dependencies = ["numpy==2.4.2"]
+
+  [project.urls]
+    Repository = "https://github.com/daniel-mizsak/python-package-template/"
+    Documentation = "https://daniel-mizsak.github.io/python-package-template/"
+    Issues = "https://github.com/daniel-mizsak/python-package-template/issues/"
+
+[dependency-groups]
+  dev = ["coverage", "nox", "pre-commit", "pytest", "ruff", "ty"]
+  docs = ["zensical", "mkdocstrings-python"]
+
+# Tools
+# Uv
+[tool.uv.build-backend]
+  module-root = "src"
+  module-name = "python_package_template"

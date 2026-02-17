@@ -1,0 +1,30 @@
+# Project
+
+# System
+.DS_Store
+
+# Python development files
+.artifacts
+.cache
+.coverage
+.nox
+.pytest_cache
+.ruff_cache
+coverage.xml
+htmlcov
+megalinter-reports
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Environments
+.env
+.venv
+
+# IDE
+.vscode
