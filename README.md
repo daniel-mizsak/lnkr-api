@@ -33,7 +33,7 @@ Link manager REST API.
 
 ### Development
 
-Setup python virtual environment for development:
+Setup Python virtual environment for development:
 
 ```bash
 just install
@@ -50,6 +50,19 @@ Run the application locally using Docker Compose:
 ```bash
 just deploy-development
 ```
+
+### Future improvements
+
+- Automatically backup database.
+- Add automatic deployment to production when new release is created.
+- Use `Alembic` for database migrations.
+- Add in-depth logging.
+- Use `Redis` for `Traefik`'s rate limiting.
+- Do not use 3rd party service for sending emails, use self hosted SMTP server.
+- Use `Docker Secrets`?
+- Use async?
+- Update email template based on the look of the frontend and update button's link.
+- Clean up old login tokens.
 
 <hr>
 
