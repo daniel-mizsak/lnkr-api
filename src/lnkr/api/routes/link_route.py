@@ -89,7 +89,7 @@ def delete_link_endpoint(
     cache: Annotated[Redis, Depends(get_cache)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
-    """Delete a link by setting its target url to none and resetting clicks."""
+    """Delete link."""
     try:
         delete_link(session, cache, slug, user)
     except SlugDoesNotExistError as slug_does_not_exist_error:
