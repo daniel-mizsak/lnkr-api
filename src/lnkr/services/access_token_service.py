@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 
 from lnkr.config import settings
-from lnkr.models.access_token_model import AccessTokenPayload
+from lnkr.models import AccessTokenPayload
 
 
 def create_access_token(email: str) -> str:
@@ -48,4 +48,4 @@ def decode_access_token(token: str) -> AccessTokenPayload:
         key=settings.ACCESS_TOKEN_SECRET_KEY,
         algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
     )
-    return AccessTokenPayload(**payload)
+    return AccessTokenPayload.model_validate(payload)

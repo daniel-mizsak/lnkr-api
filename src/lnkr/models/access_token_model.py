@@ -16,3 +16,10 @@ class AccessTokenPayload(BaseModel):
     iat: datetime
     exp: datetime
     type: str
+
+
+class AccessTokenRead(BaseModel):
+    """Access token schema for reading an access token."""
+
+    access_token: str
+    token_type: str = "bearer"  # noqa: S105
