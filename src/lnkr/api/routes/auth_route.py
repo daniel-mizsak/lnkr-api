@@ -9,13 +9,12 @@ from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Response, status
-from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from lnkr.api.dependencies import get_session, get_smtp_server
 from lnkr.config import settings
 from lnkr.exceptions import LoginTokenInvalidError
-from lnkr.models import LoginTokenCreate  # noqa: TC001
+from lnkr.models import AccessTokenRead, LoginTokenCreate
 from lnkr.services.access_token_service import create_access_token
 from lnkr.services.login_token_service import (
     create_and_save_login_token,
@@ -48,7 +47,10 @@ def request_login_token_endpoint(
 
 
 @router.get("/verify-login-token")
-def verify_login_token_endpoint(login_token_value: str, session: Annotated[Session, Depends(get_session)]) -> Response:
+def verify_login_token_endpoint(
+    login_token_value: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> AccessTokenRead:
     """Verify login token and return access token."""
     try:
         login_token = validate_login_token(session, login_token_value)
@@ -57,10 +59,7 @@ def verify_login_token_endpoint(login_token_value: str, session: Annotated[Sessi
     mark_login_token_as_used(session, login_token)
 
     access_token = create_access_token(email=login_token.email)
-    return JSONResponse(
-        {"access_token": access_token, "token_type": "bearer"},
-        status_code=status.HTTP_200_OK,
-    )
+    return AccessTokenRead(access_token=access_token)
 
 
 def _create_login_token_email(to_address: str, token: str) -> MIMEMultipart:

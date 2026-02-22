@@ -56,6 +56,7 @@ just deploy-development
 - Automatically backup database.
 - Add automatic deployment to production when new release is created.
 - Use `Alembic` for database migrations.
+- Use refresh tokens for longer sessions.
 - Add in-depth logging.
 - Use `Redis` for `Traefik`'s rate limiting.
 - Do not use 3rd party service for sending emails, use self hosted SMTP server.
