@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def test_forward_to_target_url__slug_does_not_exist(client: TestClient, slug: str) -> None:
-    response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
+    response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
     data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -32,6 +32,8 @@ def test_forward_to_target_url__success(client: TestClient, slug: str, target_ur
         json={"slug": slug, "target_url": target_url},
     )
 
-    response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
-    assert response.status_code == status.HTTP_307_TEMPORARY_REDIRECT
-    assert response.headers["Location"] == target_url
+    response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["target_url"] == target_url

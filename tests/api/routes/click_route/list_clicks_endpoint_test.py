@@ -78,8 +78,8 @@ def test_list_clicks__success(client: TestClient, slug: str, target_url: str) ->
     data = response.json()
     assert len(data) == 0
 
-    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
-    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
+    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
+    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
 
     response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.LINKS_PREFIX}/{slug}/clicks")
     data = response.json()
