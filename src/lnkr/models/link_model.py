@@ -67,6 +67,12 @@ class LinkRead(SQLModel):
         return cls(slug=link.slug, target_url=link.target_url)
 
 
+class LinkForward(SQLModel):
+    """Link schema for forwarding a link."""
+
+    target_url: str
+
+
 class LinkUpdate(SQLModel):
     """Link schema for updating a link."""
 

@@ -79,8 +79,8 @@ def test_delete_link__reset_click_count(client: TestClient, slug: str, target_ur
         url=f"{settings.API_VERSION_PREFIX}{settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
-    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
-    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}", follow_redirects=False)
+    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
+    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
 
     response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.LINKS_PREFIX}/{slug}/clicks")
     data = response.json()
