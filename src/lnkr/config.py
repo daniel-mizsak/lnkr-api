@@ -26,7 +26,8 @@ class Settings(BaseSettings):
 
     # General
     ENVIRONMENT: Environment
-    FRONTEND_URL: str = "https://lnkr.by"
+    FRONTEND_APP_URL: str = "https://app.lnkr.by"
+    FRONTEND_FORWARD_URL: str = "https://lnkr.by"
     DEVELOPMENT_USER_EMAIL: str = "user@example.com"
 
     LOGIN_TOKEN_EXPIRE_MINUTES: int = 10
