@@ -21,7 +21,8 @@ def test_environment() -> None:
 def test_settings() -> None:
     # General
     assert settings.ENVIRONMENT == Environment.DEVELOPMENT
-    assert settings.FRONTEND_URL == "https://lnkr.by"
+    assert settings.FRONTEND_APP_URL == "https://app.lnkr.by"
+    assert settings.FRONTEND_FORWARD_URL == "https://lnkr.by"
     assert settings.DEVELOPMENT_USER_EMAIL == "user@example.com"
 
     assert settings.LOGIN_TOKEN_EXPIRE_MINUTES == 10

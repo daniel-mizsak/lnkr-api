@@ -52,7 +52,9 @@ def root() -> RedirectResponse:
 
 app.add_middleware(
     CORSMiddleware,  # ty:ignore[invalid-argument-type]
-    allow_origins=["*"] if settings.ENVIRONMENT == Environment.DEVELOPMENT else [settings.FRONTEND_URL],
+    allow_origins=["*"]
+    if settings.ENVIRONMENT == Environment.DEVELOPMENT
+    else [settings.FRONTEND_APP_URL, settings.FRONTEND_FORWARD_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

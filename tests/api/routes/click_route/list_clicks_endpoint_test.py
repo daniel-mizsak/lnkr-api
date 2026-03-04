@@ -79,7 +79,12 @@ def test_list_clicks__success(client: TestClient, slug: str, target_url: str) ->
     assert len(data) == 0
 
     client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
-    client.get(url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}")
+    client.get(
+        url=f"{settings.API_VERSION_PREFIX}{settings.FORWARD_PREFIX}/{slug}",
+        headers={
+            "X-Client-IP": "192.168.1.1",
+        },
+    )
 
     response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.LINKS_PREFIX}/{slug}/clicks")
     data = response.json()
@@ -91,5 +96,5 @@ def test_list_clicks__success(client: TestClient, slug: str, target_url: str) ->
     for item in data:
         item_timestamp = datetime.fromisoformat(item["timestamp"]).replace(tzinfo=UTC)
         assert timestamp < item_timestamp < timestamp + timedelta(seconds=1)
-        assert item["ip_address"] == "unknown"
         assert set(item.keys()) == {"ip_address", "timestamp"}
+    assert {item["ip_address"] for item in data} == {"unknown", "192.168.1.1"}
