@@ -39,3 +39,15 @@ class User(SQLModel, table=True):
     def from_user_create(cls, user_create: UserCreate) -> User:
         """Create a User instance from a UserCreate instance."""
         return cls(email=user_create.email)
+
+
+class UserRead(SQLModel):
+    """User schema for reading a user."""
+
+    email: EmailStr
+    status: UserStatus
+
+    @classmethod
+    def from_user(cls, user: User) -> UserRead:
+        """Create a UserRead instance from a User instance."""
+        return cls(email=user.email, status=user.status)
