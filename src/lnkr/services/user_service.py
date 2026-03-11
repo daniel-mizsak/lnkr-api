@@ -11,7 +11,7 @@ from lnkr.exceptions import UserAlreadyExistsError, UserDoesNotExistError
 from lnkr.models import User, UserCreate
 
 if TYPE_CHECKING:
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 
 def get_or_create_user(session: Session, user_create: UserCreate) -> User:

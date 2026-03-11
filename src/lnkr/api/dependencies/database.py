@@ -6,7 +6,7 @@ FastAPI dependency that provides the database session.
 
 from typing import TYPE_CHECKING
 
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 
 from lnkr.database import engine
 

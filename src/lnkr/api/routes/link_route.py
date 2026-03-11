@@ -27,7 +27,7 @@ from lnkr.services.link_service import (
 
 if TYPE_CHECKING:
     from redis import Redis
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 router = APIRouter(prefix=settings.LINKS_PREFIX)
 

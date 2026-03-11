@@ -25,7 +25,7 @@ from lnkr.services.login_token_service import (
 if TYPE_CHECKING:
     import smtplib
 
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 email_templates = Jinja2Templates(directory="templates/email")
 

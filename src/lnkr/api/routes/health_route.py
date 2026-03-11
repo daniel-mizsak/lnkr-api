@@ -17,7 +17,7 @@ from lnkr.config import settings
 
 if TYPE_CHECKING:
     from redis import Redis
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ def health_check_endpoint(
 ) -> JSONResponse:
     """Health check endpoint to verify the API is running."""
     try:
-        session.execute(text("SELECT 1"))  # ty:ignore[deprecated]
+        session.execute(text("SELECT 1"))
     except OperationalError:
         return JSONResponse(
             content={"message": "Database connection failed"},

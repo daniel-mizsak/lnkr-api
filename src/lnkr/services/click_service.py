@@ -12,7 +12,7 @@ from lnkr.models import Click, ClickCreate, Link
 if TYPE_CHECKING:
     import uuid
 
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 
 def create_click(session: Session, click_create: ClickCreate, link_id: uuid.UUID) -> Click:

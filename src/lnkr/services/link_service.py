@@ -19,7 +19,7 @@ from lnkr.models import Link, LinkCache, LinkCreate, LinkUpdate, User
 
 if TYPE_CHECKING:
     from redis import Redis
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 
 def create_link(session: Session, link_create: LinkCreate, user: User) -> Link:

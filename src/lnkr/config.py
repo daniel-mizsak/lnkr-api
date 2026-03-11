@@ -61,7 +61,7 @@ class Settings(BaseSettings):
         """Generate the database url from the connection parameters."""
         return PostgresDsn(
             MultiHostUrl.build(
-                scheme="postgresql",
+                scheme="postgresql+psycopg",
                 username=self.POSTGRES_USERNAME,
                 password=self.POSTGRES_PASSWORD,
                 host=self.POSTGRES_HOST,

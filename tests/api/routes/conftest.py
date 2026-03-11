@@ -11,18 +11,20 @@ from unittest.mock import MagicMock
 import pytest
 from fakeredis import FakeRedis
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from lnkr.api.dependencies import get_cache, get_current_user, get_session, get_smtp_server
 from lnkr.main import app
 from lnkr.models import User
+from lnkr.models.base import Base
 
 
 @pytest.fixture(name="session")
 def session_fixture(user: User, other_user: User) -> Iterator[Session]:
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    SQLModel.metadata.create_all(engine)
+    Base.metadata.create_all(bind=engine)
     with Session(engine) as session:
         session.add(user)
         session.add(other_user)

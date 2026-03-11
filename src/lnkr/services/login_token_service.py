@@ -14,7 +14,7 @@ from lnkr.exceptions import LoginTokenInvalidError
 from lnkr.models import LoginToken, LoginTokenCreate
 
 if TYPE_CHECKING:
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 
 def create_and_save_login_token(session: Session, login_token_create: LoginTokenCreate) -> str:

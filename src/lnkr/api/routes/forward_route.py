@@ -17,7 +17,7 @@ from lnkr.services.link_service import get_cached_link
 
 if TYPE_CHECKING:
     from redis import Redis
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 router = APIRouter(prefix=settings.FORWARD_PREFIX)
 

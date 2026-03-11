@@ -16,7 +16,7 @@ from lnkr.services.click_service import list_clicks
 from lnkr.services.link_service import get_link_validate_user
 
 if TYPE_CHECKING:
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 router = APIRouter(prefix=settings.LINKS_PREFIX)
 

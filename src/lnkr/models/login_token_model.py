@@ -7,34 +7,36 @@ Data schemas and database models for login token management.
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from pydantic import EmailStr  # noqa: TC002
-from sqlmodel import Column, DateTime, Field, SQLModel
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import DateTime, String, Uuid
+from sqlalchemy.orm import Mapped, mapped_column
 
 from lnkr.config import settings
+from lnkr.models.base import Base
 
 
-class LoginTokenCreate(SQLModel):
+class LoginTokenCreate(BaseModel):
     """Login token schema for creating a login token."""
 
     email: EmailStr = Field(max_length=64)
 
 
-class LoginToken(SQLModel, table=True):
+class LoginToken(Base):
     """Login token model saved in the database."""
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    email: EmailStr = Field(max_length=64)
-    token_hash: str = Field(index=True)
+    __tablename__ = "login_tokens"
 
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(tz=UTC),
-        sa_column=Column(DateTime(timezone=True), nullable=False),
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    email: Mapped[EmailStr] = mapped_column(String(64), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String, index=True, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=UTC),
+        nullable=False,
     )
-    expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))
-    used_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # TODO: Maybe store additional info like IP address, user agent, etc.
 
     @property

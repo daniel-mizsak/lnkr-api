@@ -17,7 +17,7 @@ from lnkr.services.access_token_service import decode_access_token
 from lnkr.services.user_service import get_or_create_user, get_user
 
 if TYPE_CHECKING:
-    from sqlmodel import Session
+    from sqlalchemy.orm import Session
 
 security = HTTPBearer(auto_error=False)
 
