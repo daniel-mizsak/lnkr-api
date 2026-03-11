@@ -4,7 +4,7 @@ API endpoints for managing links.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
@@ -100,12 +100,14 @@ def delete_link_endpoint(
 
 
 @router.get("")
-def list_links_endpoint(
+def list_links_endpoint(  # noqa: PLR0913
     session: Annotated[Session, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
+    sort: Annotated[Literal["created_at", "updated_at"], Query()] = "updated_at",
+    direction: Annotated[Literal["ascending", "descending"], Query()] = "descending",
     per_page: Annotated[int, Query(ge=1, le=100)] = 10,
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[LinkRead]:
     """List all links that have a target url."""
-    links = list_links(session, user, per_page, page)
+    links = list_links(session, user, sort, direction, per_page, page)
     return [LinkRead.from_link(link) for link in links]

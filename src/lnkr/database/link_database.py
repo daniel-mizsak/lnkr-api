@@ -4,6 +4,8 @@ Low level database operations for link management.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
+from typing import Literal
+
 from sqlmodel import Session, col, func, select
 
 from lnkr.models import Link, User
@@ -34,8 +36,19 @@ def count_links_by_user(session: Session, user: User) -> int:
     return session.exec(statement).one()
 
 
-def list_links_by_user(session: Session, user: User, per_page: int, page: int) -> list[Link]:
+def list_links_by_user(  # noqa: PLR0913
+    session: Session,
+    user: User,
+    sort: Literal["created_at", "updated_at"],
+    direction: Literal["ascending", "descending"],
+    per_page: int,
+    page: int,
+) -> list[Link]:
     """List all links owned by a user."""
     offset = (page - 1) * per_page
-    statement = select(Link).where(Link.user_id == user.id).order_by(col(Link.id).desc()).offset(offset).limit(per_page)
+
+    sort_column = col(Link.created_at) if sort == "created_at" else col(Link.updated_at)
+    order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
+
+    statement = select(Link).where(Link.user_id == user.id).order_by(order_clause).offset(offset).limit(per_page)
     return list(session.exec(statement).all())

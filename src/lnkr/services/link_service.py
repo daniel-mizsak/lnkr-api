@@ -4,7 +4,7 @@ High level database operations for link management.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from lnkr.cache import link_cache
 from lnkr.config import settings
@@ -139,12 +139,21 @@ def delete_link(session: Session, cache: Redis, slug: str, user: User) -> None:
     link_database.delete_link(session, link)
 
 
-def list_links(session: Session, user: User, per_page: int, page: int) -> list[Link]:
+def list_links(  # noqa: PLR0913
+    session: Session,
+    user: User,
+    sort: Literal["created_at", "updated_at"],
+    direction: Literal["ascending", "descending"],
+    per_page: int,
+    page: int,
+) -> list[Link]:
     """List all links for a given user.
 
     Args:
         session (Session): The database session.
         user (User): The user to list links for.
+        sort (str): The property to sort the results by.
+        direction (str): The order to sort by.
         per_page (int): The number of links to return per page. Maximum is 100.
         page (int): The page number of the links to return.
 
@@ -152,4 +161,4 @@ def list_links(session: Session, user: User, per_page: int, page: int) -> list[L
         list[Link]: A list of link objects.
     """
     per_page = min(per_page, 100)
-    return link_database.list_links_by_user(session, user, per_page, page)
+    return link_database.list_links_by_user(session, user, sort, direction, per_page, page)

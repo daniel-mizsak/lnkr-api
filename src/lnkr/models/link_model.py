@@ -5,10 +5,11 @@ Data schemas and database models for link management.
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from pydantic import HttpUrl  # noqa: TC002
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from lnkr.models import Click, User
@@ -25,6 +26,14 @@ class Link(SQLModel, table=True):
     """Link model saved in the database."""
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(tz=UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(tz=UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
     slug: str = Field(index=True, unique=True, min_length=4, max_length=16)
     target_url: str
     clicks: list[Click] = Relationship(back_populates="link", cascade_delete=True)
@@ -40,6 +49,7 @@ class Link(SQLModel, table=True):
     def update_from_link_update(self, link_update: LinkUpdate) -> None:
         """Update the Link instance from a LinkUpdate instance."""
         self.target_url = str(link_update.target_url)
+        self.updated_at = datetime.now(tz=UTC)
 
 
 class LinkCache(SQLModel):
