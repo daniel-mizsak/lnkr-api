@@ -15,8 +15,6 @@ if TYPE_CHECKING:
 
 
 def test_get_user__success(client: TestClient) -> None:
-    client.post(url=f"{settings.API_VERSION_PREFIX}{settings.USER_PREFIX}")
-
     response = client.get(url=f"{settings.API_VERSION_PREFIX}{settings.USER_PREFIX}")
     data = response.json()
 

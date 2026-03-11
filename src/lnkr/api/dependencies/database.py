@@ -6,15 +6,15 @@ FastAPI dependency that provides the database session.
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from lnkr.database import engine
+from lnkr.database import SessionLocal
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
     """Get session for database operations."""
-    async with AsyncSession(engine) as session:
+    async with SessionLocal() as session:
         yield session
