@@ -16,7 +16,7 @@ from lnkr.services.click_service import create_click
 from lnkr.services.link_service import get_cached_link
 
 if TYPE_CHECKING:
-    from redis import Redis
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix=settings.FORWARD_PREFIX)

@@ -7,7 +7,7 @@ Main application.
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-import redis
+import redis.asyncio as redis
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await create_database()
     app.state.cache = redis.from_url(settings.REDIS_URL, decode_responses=True)
     yield
-    app.state.cache.close()
+    await app.state.cache.close()
     await engine.dispose()
 
 

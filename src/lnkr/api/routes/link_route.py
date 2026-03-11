@@ -26,7 +26,7 @@ from lnkr.services.link_service import (
 )
 
 if TYPE_CHECKING:
-    from redis import Redis
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix=settings.LINKS_PREFIX)

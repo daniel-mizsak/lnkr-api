@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator, Callable, Generator, Iterator
 from unittest.mock import MagicMock
 
 import pytest
-from fakeredis import FakeRedis
+from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -30,6 +30,7 @@ async def session_fixture(user: User, other_user: User) -> AsyncGenerator[AsyncS
         session.add(other_user)
         await session.commit()
         yield session
+    await engine.dispose()
 
 
 @pytest.fixture(name="mock_smtp")
@@ -39,11 +40,11 @@ def mock_smtp_fixture() -> MagicMock:
 
 @pytest.fixture(name="client")
 def client_fixture(session: AsyncSession, mock_smtp: MagicMock, user: User) -> Iterator[TestClient]:
-    fake_redis = FakeRedis()
+    fake_async_redis = FakeAsyncRedis()
 
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_cache] = lambda: fake_redis
+    app.dependency_overrides[get_cache] = lambda: fake_async_redis
     app.dependency_overrides[get_smtp_server] = lambda: mock_smtp
 
     client = TestClient(app)

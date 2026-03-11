@@ -18,7 +18,7 @@ from lnkr.exceptions import (
 from lnkr.models import Link, LinkCache, LinkCreate, LinkUpdate, User
 
 if TYPE_CHECKING:
-    from redis import Redis
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -60,13 +60,13 @@ async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> Lin
     Returns:
         LinkCache: LinkCache object.
     """
-    cached_link = link_cache.get_cached_link_by_slug(cache, slug)
+    cached_link = await link_cache.get_cached_link_by_slug(cache, slug)
     if cached_link is not None:
         return cached_link
 
     link = await _get_link(session, slug)
     cached_link = LinkCache.from_link(link)
-    link_cache.add_cached_link(cache, cached_link)
+    await link_cache.add_cached_link(cache, cached_link)
     return cached_link
 
 
@@ -119,7 +119,7 @@ async def update_link_target_url(
     """
     link = await get_link_validate_user(session, slug, user)
     link.update_from_link_update(link_update)
-    link_cache.delete_cached_link_by_slug(cache, slug)
+    await link_cache.delete_cached_link_by_slug(cache, slug)
     return await link_database.add_link(session, link)
 
 
@@ -137,7 +137,7 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         SlugNotOwnedByUserError: If the slug is not owned by the user.
     """
     link = await get_link_validate_user(session, slug, user)
-    link_cache.delete_cached_link_by_slug(cache, slug)
+    await link_cache.delete_cached_link_by_slug(cache, slug)
     await link_database.delete_link(session, link)
 
 
