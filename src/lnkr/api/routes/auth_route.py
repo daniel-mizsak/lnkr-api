@@ -25,7 +25,7 @@ from lnkr.services.login_token_service import (
 if TYPE_CHECKING:
     import smtplib
 
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 email_templates = Jinja2Templates(directory="templates/email")
 
@@ -34,29 +34,29 @@ router = APIRouter(prefix=settings.AUTH_PREFIX)
 
 
 @router.post("/request-login-token")
-def request_login_token_endpoint(
+async def request_login_token_endpoint(
     login_token_create: LoginTokenCreate,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     smtp_server: Annotated[smtplib.SMTP, Depends(get_smtp_server)],
 ) -> Response:
     """Request a login token that is sent to the user's email."""
-    login_token_value = create_and_save_login_token(session, login_token_create)
+    login_token_value = await create_and_save_login_token(session, login_token_create)
 
     smtp_server.send_message(_create_login_token_email(login_token_create.email, login_token_value))
     return Response(status_code=status.HTTP_200_OK)
 
 
 @router.get("/verify-login-token")
-def verify_login_token_endpoint(
+async def verify_login_token_endpoint(
     login_token_value: str,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AccessTokenRead:
     """Verify login token and return access token."""
     try:
-        login_token = validate_login_token(session, login_token_value)
+        login_token = await validate_login_token(session, login_token_value)
     except LoginTokenInvalidError as login_token_invalid_error:
         login_token_invalid_error.raise_http_exception()
-    mark_login_token_as_used(session, login_token)
+    await mark_login_token_as_used(session, login_token)
 
     access_token = create_access_token(email=login_token.email)
     return AccessTokenRead(access_token=access_token)

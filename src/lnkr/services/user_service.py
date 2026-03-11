@@ -11,30 +11,30 @@ from lnkr.exceptions import UserAlreadyExistsError, UserDoesNotExistError
 from lnkr.models import User, UserCreate
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def get_or_create_user(session: Session, user_create: UserCreate) -> User:
+async def get_or_create_user(session: AsyncSession, user_create: UserCreate) -> User:
     """Get or create a user in the database.
 
     Args:
-        session (Session): The database session.
+        session (AsyncSession): The database session.
         user_create (UserCreate): The data model for creating a user.
 
     Returns:
         User: User object.
     """
     try:
-        return get_user(session, user_create.email)
+        return await get_user(session, user_create.email)
     except UserDoesNotExistError:
-        return _create_user(session, user_create)
+        return await _create_user(session, user_create)
 
 
-def get_user(session: Session, email: str) -> User:
+async def get_user(session: AsyncSession, email: str) -> User:
     """Get a user from the database by its email.
 
     Args:
-        session (Session): The database session.
+        session (AsyncSession): The database session.
         email (str): The email of the user.
 
     Raises:
@@ -43,13 +43,13 @@ def get_user(session: Session, email: str) -> User:
     Returns:
         User: User object.
     """
-    user = user_database.get_user_by_email(session, email)
+    user = await user_database.get_user_by_email(session, email)
     if user is None:
         raise UserDoesNotExistError(email=email)
     return user
 
 
-def _create_user(session: Session, user_create: UserCreate) -> User:
-    if user_database.get_user_by_email(session, user_create.email) is not None:
+async def _create_user(session: AsyncSession, user_create: UserCreate) -> User:
+    if await user_database.get_user_by_email(session, user_create.email) is not None:
         raise UserAlreadyExistsError(email=user_create.email)
-    return user_database.add_user(session, User.from_user_create(user_create))
+    return await user_database.add_user(session, User.from_user_create(user_create))

@@ -16,6 +16,6 @@ router = APIRouter(prefix=settings.USER_PREFIX)
 
 
 @router.get("")
-def get_user_endpoint(user: Annotated[User, Depends(get_current_user)]) -> UserRead:
+async def get_user_endpoint(user: Annotated[User, Depends(get_current_user)]) -> UserRead:
     """Get a user."""
     return UserRead.from_user(user)

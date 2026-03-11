@@ -11,38 +11,38 @@ from sqlalchemy import func, select
 from lnkr.models import Link, User
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def add_link(session: Session, link: Link) -> Link:
+async def add_link(session: AsyncSession, link: Link) -> Link:
     """Add link to database."""
     session.add(link)
-    session.commit()
-    session.refresh(link)
+    await session.commit()
+    await session.refresh(link)
     return link
 
 
-def get_link_by_slug(session: Session, slug: str) -> Link | None:
+async def get_link_by_slug(session: AsyncSession, slug: str) -> Link | None:
     """Get link from database by slug."""
-    result = session.execute(select(Link).where(Link.slug == slug).limit(1))
+    result = await session.execute(select(Link).where(Link.slug == slug).limit(1))
     return result.scalars().first()
 
 
-def delete_link(session: Session, link: Link) -> None:
+async def delete_link(session: AsyncSession, link: Link) -> None:
     """Delete link from database."""
-    session.delete(link)
-    session.commit()
+    await session.delete(link)
+    await session.commit()
 
 
-def count_links_by_user(session: Session, user: User) -> int:
+async def count_links_by_user(session: AsyncSession, user: User) -> int:
     """Count the number of links owned by a user."""
     statement = select(func.count()).where(Link.user_id == user.id)
-    result = session.execute(statement)
+    result = await session.execute(statement)
     return result.scalar_one()
 
 
-def list_links_by_user(  # noqa: PLR0913
-    session: Session,
+async def list_links_by_user(  # noqa: PLR0913
+    session: AsyncSession,
     user: User,
     sort: Literal["created_at", "updated_at"],
     direction: Literal["ascending", "descending"],
@@ -56,5 +56,5 @@ def list_links_by_user(  # noqa: PLR0913
     order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
 
     statement = select(Link).where(Link.user_id == user.id).order_by(order_clause).offset(offset).limit(per_page)
-    result = session.execute(statement)
+    result = await session.execute(statement)
     return list(result.scalars().all())

@@ -26,17 +26,23 @@
 
 [dependency-groups]
   dev = [
+    "aiosqlite",
     "beautifulsoup4",
     "coverage",
     "fakeredis",
     "pre-commit",
     "pytest",
+    "pytest-asyncio",
     "ruff",
     "ty",
   ]
   deployment = ["ansible"]
 
 # Tools
+# Pytest
+[tool.pytest.ini_options]
+  asyncio_mode = "auto"
+
 # Uv
 [tool.uv.build-backend]
   module-root = "src"

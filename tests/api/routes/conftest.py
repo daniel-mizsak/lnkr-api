@@ -5,14 +5,13 @@ Fixtures used in testing api routes.
 """
 
 import smtplib
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import AsyncGenerator, Callable, Generator, Iterator
 from unittest.mock import MagicMock
 
 import pytest
 from fakeredis import FakeRedis
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from lnkr.api.dependencies import get_cache, get_current_user, get_session, get_smtp_server
@@ -22,13 +21,14 @@ from lnkr.models.base import Base
 
 
 @pytest.fixture(name="session")
-def session_fixture(user: User, other_user: User) -> Iterator[Session]:
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(bind=engine)
-    with Session(engine) as session:
+async def session_fixture(user: User, other_user: User) -> AsyncGenerator[AsyncSession]:
+    engine = create_async_engine("sqlite+aiosqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         session.add(user)
         session.add(other_user)
-        session.commit()
+        await session.commit()
         yield session
 
 
@@ -38,7 +38,7 @@ def mock_smtp_fixture() -> MagicMock:
 
 
 @pytest.fixture(name="client")
-def client_fixture(session: Session, mock_smtp: MagicMock, user: User) -> Iterator[TestClient]:
+def client_fixture(session: AsyncSession, mock_smtp: MagicMock, user: User) -> Iterator[TestClient]:
     fake_redis = FakeRedis()
 
     app.dependency_overrides[get_session] = lambda: session

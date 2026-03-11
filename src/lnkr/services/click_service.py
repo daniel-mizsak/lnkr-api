@@ -12,28 +12,28 @@ from lnkr.models import Click, ClickCreate, Link
 if TYPE_CHECKING:
     import uuid
 
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def create_click(session: Session, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
+async def create_click(session: AsyncSession, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
     """Create a click in the database.
 
     Args:
-        session (Session): The database session.
+        session (AsyncSession): The database session.
         click_create (ClickCreate): The data model for creating a click.
         link_id (uuid.UUID): The id of the link the click belongs to.
 
     Returns:
         Click: Click object.
     """
-    return click_database.add_click(session, Click.from_click_create(click_create, link_id))
+    return await click_database.add_click(session, Click.from_click_create(click_create, link_id))
 
 
-def list_clicks(session: Session, link: Link, per_page: int, page: int) -> list[Click]:
+async def list_clicks(session: AsyncSession, link: Link, per_page: int, page: int) -> list[Click]:
     """List all clicks for a given link.
 
     Args:
-        session (Session): The database session.
+        session (AsyncSession): The database session.
         link (Link): The link to list clicks for.
         per_page (int): The number of clicks to return per page. Maximum is 100.
         page (int): The page number of the clicks to return.
@@ -42,4 +42,4 @@ def list_clicks(session: Session, link: Link, per_page: int, page: int) -> list[
         list[Click]: A list of click objects.
     """
     per_page = min(per_page, 100)
-    return click_database.list_clicks_by_link(session, link, per_page, page)
+    return await click_database.list_clicks_by_link(session, link, per_page, page)

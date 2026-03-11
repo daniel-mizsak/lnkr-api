@@ -34,11 +34,11 @@ if (settings.SENTRY_DSN is not None) and (settings.ENVIRONMENT != Environment.DE
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Execute before application startup."""
-    create_database()
+    await create_database()
     app.state.cache = redis.from_url(settings.REDIS_URL, decode_responses=True)
     yield
     app.state.cache.close()
-    engine.dispose()
+    await engine.dispose()
 
 
 app = FastAPI(title="lnkr", description="Link manager REST API.", version=settings.API_VERSION, lifespan=lifespan)

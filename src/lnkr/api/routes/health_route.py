@@ -17,19 +17,19 @@ from lnkr.config import settings
 
 if TYPE_CHECKING:
     from redis import Redis
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 @router.get("/health")
-def health_check_endpoint(
-    session: Annotated[Session, Depends(get_session)],
+async def health_check_endpoint(
+    session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
 ) -> JSONResponse:
     """Health check endpoint to verify the API is running."""
     try:
-        session.execute(text("SELECT 1"))
+        await session.execute(text("SELECT 1"))
     except OperationalError:
         return JSONResponse(
             content={"message": "Database connection failed"},
