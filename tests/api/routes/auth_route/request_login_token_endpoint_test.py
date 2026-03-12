@@ -5,7 +5,9 @@ Tests for the request login token endpoint.
 """
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
+import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
 
@@ -13,20 +15,28 @@ from lnkr.config import settings
 from lnkr.services.access_token_service import decode_access_token
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
-
     from fastapi.testclient import TestClient
 
 
-def test_request_login_token__success(client: TestClient, mock_smtp: MagicMock, email: str) -> None:
+@pytest.fixture(name="mock_send_email")
+def mock_send_email_fixture(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    mock_send_email = AsyncMock()
+    monkeypatch.setattr("lnkr.api.routes.auth_route.send_email", mock_send_email)
+    return mock_send_email
+
+
+def test_request_login_token__success(client: TestClient, mock_send_email: AsyncMock, email: str) -> None:
     response = client.post(
         url=f"{settings.API_VERSION_PREFIX}{settings.AUTH_PREFIX}/request-login-token",
         json={"email": email},
     )
     assert response.status_code == status.HTTP_200_OK
 
-    mock_smtp.send_message.assert_called_once()
-    sent_email = mock_smtp.send_message.call_args[0][0]
+    mock_send_email.assert_awaited_once()
+
+    await_args = mock_send_email.await_args
+    assert await_args is not None
+    sent_email = await_args.args[0]
 
     assert sent_email["To"] == email
     assert sent_email["From"] == settings.FROM_EMAIL
