@@ -44,8 +44,9 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
     API_VERSION_PREFIX: str = f"/{API_VERSION}"
     AUTH_PREFIX: str = "/auth"
-    LINKS_PREFIX: str = "/links"
     FORWARD_PREFIX: str = "/forward"
+    LINKS_PREFIX: str = "/links"
+    USER_PREFIX: str = "/user"
 
     # Postgres
     POSTGRES_HOST: str
@@ -60,7 +61,7 @@ class Settings(BaseSettings):
         """Generate the database url from the connection parameters."""
         return PostgresDsn(
             MultiHostUrl.build(
-                scheme="postgresql",
+                scheme="postgresql+psycopg",
                 username=self.POSTGRES_USERNAME,
                 password=self.POSTGRES_PASSWORD,
                 host=self.POSTGRES_HOST,

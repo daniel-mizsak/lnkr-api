@@ -4,7 +4,7 @@ API endpoints for health check.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
@@ -16,20 +16,22 @@ from lnkr.api.dependencies import get_cache, get_session
 from lnkr.config import settings
 
 if TYPE_CHECKING:
-    from redis import Redis
-    from sqlmodel import Session
+    from collections.abc import Awaitable
+
+    from redis.asyncio import Redis
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 @router.get("/health")
-def health_check_endpoint(
-    session: Annotated[Session, Depends(get_session)],
+async def health_check_endpoint(
+    session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
 ) -> JSONResponse:
     """Health check endpoint to verify the API is running."""
     try:
-        session.execute(text("SELECT 1"))  # ty:ignore[deprecated]
+        await session.execute(text("SELECT 1"))
     except OperationalError:
         return JSONResponse(
             content={"message": "Database connection failed"},
@@ -37,7 +39,7 @@ def health_check_endpoint(
         )
 
     try:
-        cache_status = cache.ping()
+        cache_status = await cast("Awaitable[bool]", cache.ping())
     except RedisError:
         cache_status = False
 

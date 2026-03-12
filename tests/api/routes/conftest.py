@@ -4,45 +4,40 @@ Fixtures used in testing api routes.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
-import smtplib
-from collections.abc import Callable, Generator, Iterator
-from unittest.mock import MagicMock
+from collections.abc import AsyncGenerator, Callable, Generator, Iterator
 
 import pytest
-from fakeredis import FakeRedis
+from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import StaticPool
 
-from lnkr.api.dependencies import get_cache, get_current_user, get_session, get_smtp_server
+from lnkr.api.dependencies import get_cache, get_current_user, get_session
 from lnkr.main import app
 from lnkr.models import User
+from lnkr.models.base import Base
 
 
 @pytest.fixture(name="session")
-def session_fixture(user: User, other_user: User) -> Iterator[Session]:
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
+async def session_fixture(user: User, other_user: User) -> AsyncGenerator[AsyncSession]:
+    engine = create_async_engine("sqlite+aiosqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         session.add(user)
         session.add(other_user)
-        session.commit()
+        await session.commit()
         yield session
-
-
-@pytest.fixture(name="mock_smtp")
-def mock_smtp_fixture() -> MagicMock:
-    return MagicMock(spec=smtplib.SMTP)
+    await engine.dispose()
 
 
 @pytest.fixture(name="client")
-def client_fixture(session: Session, mock_smtp: MagicMock, user: User) -> Iterator[TestClient]:
-    fake_redis = FakeRedis()
+def client_fixture(session: AsyncSession, user: User) -> Iterator[TestClient]:
+    fake_async_redis = FakeAsyncRedis()
 
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_cache] = lambda: fake_redis
-    app.dependency_overrides[get_smtp_server] = lambda: mock_smtp
+    app.dependency_overrides[get_cache] = lambda: fake_async_redis
 
     client = TestClient(app)
     yield client

@@ -8,35 +8,23 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship, SQLModel
+from pydantic import BaseModel
+from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from lnkr.models.base import Base
 
 if TYPE_CHECKING:
     from lnkr.models import Link
 
 
-class ClickCreate(SQLModel):
+class ClickCreate(BaseModel):
     """Click schema for creating a click."""
 
     ip_address: str
 
 
-class Click(SQLModel, table=True):
-    """Click model saved in the database."""
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
-    ip_address: str
-
-    link_id: uuid.UUID = Field(foreign_key="link.id", index=True, ondelete="CASCADE")
-    link: Link = Relationship(back_populates="clicks")
-
-    @classmethod
-    def from_click_create(cls, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
-        """Create a Click instance from a ClickCreate instance."""
-        return cls(ip_address=click_create.ip_address, link_id=link_id)
-
-
-class ClickRead(SQLModel):
+class ClickRead(BaseModel):
     """Click schema for reading a click."""
 
     timestamp: datetime
@@ -46,3 +34,25 @@ class ClickRead(SQLModel):
     def from_click(cls, click: Click) -> ClickRead:
         """Create a ClickRead instance from a Click instance."""
         return cls(timestamp=click.timestamp, ip_address=click.ip_address)
+
+
+class Click(Base):
+    """Click model saved in the database."""
+
+    __tablename__ = "clicks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(tz=UTC),
+        nullable=False,
+    )
+    ip_address: Mapped[str] = mapped_column(String, nullable=False)
+
+    link_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("links.id", ondelete="CASCADE"), index=True)
+    link: Mapped[Link] = relationship(back_populates="clicks")
+
+    @classmethod
+    def from_click_create(cls, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
+        """Create a Click instance from a ClickCreate instance."""
+        return cls(ip_address=click_create.ip_address, link_id=link_id)

@@ -7,7 +7,7 @@ Main application.
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-import redis
+import redis.asyncio as redis
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,18 +34,18 @@ if (settings.SENTRY_DSN is not None) and (settings.ENVIRONMENT != Environment.DE
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Execute before application startup."""
-    create_database()
+    await create_database()
     app.state.cache = redis.from_url(settings.REDIS_URL, decode_responses=True)
     yield
-    app.state.cache.close()
-    engine.dispose()
+    await app.state.cache.close()
+    await engine.dispose()
 
 
 app = FastAPI(title="lnkr", description="Link manager REST API.", version=settings.API_VERSION, lifespan=lifespan)
 
 
 @app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
+async def root() -> RedirectResponse:
     """Redirect to API documentation."""
     return RedirectResponse(url="/docs")
 

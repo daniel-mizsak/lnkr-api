@@ -4,7 +4,7 @@ API endpoints for managing links.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
@@ -26,21 +26,21 @@ from lnkr.services.link_service import (
 )
 
 if TYPE_CHECKING:
-    from redis import Redis
-    from sqlmodel import Session
+    from redis.asyncio import Redis
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix=settings.LINKS_PREFIX)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_link_endpoint(
+async def create_link_endpoint(
     link_create: LinkCreate,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Create a link with a slug that points to the target url."""
     try:
-        link = create_link(session, link_create, user)
+        link = await create_link(session, link_create, user)
     except SlugAlreadyExistsError as slug_already_exists_error:
         slug_already_exists_error.raise_http_exception()
     except UserLinkLimitExceededError as user_link_limit_exceeded_error:
@@ -49,14 +49,14 @@ def create_link_endpoint(
 
 
 @router.get("/{slug}")
-def get_link_endpoint(
+async def get_link_endpoint(
     slug: str,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Get a link by its slug."""
     try:
-        link = get_link_validate_user(session, slug, user)
+        link = await get_link_validate_user(session, slug, user)
     except SlugDoesNotExistError as slug_does_not_exist_error:
         slug_does_not_exist_error.raise_http_exception()
     except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
@@ -65,16 +65,16 @@ def get_link_endpoint(
 
 
 @router.patch("/{slug}")
-def update_link_endpoint(
+async def update_link_endpoint(
     slug: str,
     link_update: LinkUpdate,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Update the target url of a link."""
     try:
-        link = update_link_target_url(session, cache, slug, link_update, user)
+        link = await update_link_target_url(session, cache, slug, link_update, user)
     except SlugDoesNotExistError as slug_does_not_exist_error:
         slug_does_not_exist_error.raise_http_exception()
     except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
@@ -83,15 +83,15 @@ def update_link_endpoint(
 
 
 @router.delete("/{slug}")
-def delete_link_endpoint(
+async def delete_link_endpoint(
     slug: str,
-    session: Annotated[Session, Depends(get_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     """Delete link."""
     try:
-        delete_link(session, cache, slug, user)
+        await delete_link(session, cache, slug, user)
     except SlugDoesNotExistError as slug_does_not_exist_error:
         slug_does_not_exist_error.raise_http_exception()
     except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
@@ -100,12 +100,14 @@ def delete_link_endpoint(
 
 
 @router.get("")
-def list_links_endpoint(
-    session: Annotated[Session, Depends(get_session)],
+async def list_links_endpoint(  # noqa: PLR0913
+    session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
+    sort: Annotated[Literal["created_at", "updated_at"], Query()] = "updated_at",
+    direction: Annotated[Literal["ascending", "descending"], Query()] = "descending",
     per_page: Annotated[int, Query(ge=1, le=100)] = 10,
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[LinkRead]:
     """List all links that have a target url."""
-    links = list_links(session, user, per_page, page)
+    links = await list_links(session, user, sort, direction, per_page, page)
     return [LinkRead.from_link(link) for link in links]
