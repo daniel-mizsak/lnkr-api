@@ -55,6 +55,7 @@ async def verify_login_token_endpoint(
         login_token = await validate_login_token(session, login_token_value)
     except LoginTokenInvalidError as login_token_invalid_error:
         login_token_invalid_error.raise_http_exception()
+    # TODO: Consume the token in a single step instead of separate validation and marking as used.
     await mark_login_token_as_used(session, login_token)
 
     access_token = create_access_token(email=login_token.email)

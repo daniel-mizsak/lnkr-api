@@ -45,7 +45,7 @@ app = FastAPI(title="lnkr", description="Link manager REST API.", version=settin
 
 
 @app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
+async def root() -> RedirectResponse:
     """Redirect to API documentation."""
     return RedirectResponse(url="/docs")
 

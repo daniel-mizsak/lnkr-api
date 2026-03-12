@@ -4,9 +4,11 @@ API endpoint for forwarding links.
 @author "Daniel Mizsak" <info@pythonvilag.hu>
 """
 
+from contextlib import suppress
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Header
+from sqlalchemy.exc import SQLAlchemyError
 
 from lnkr.api.dependencies import get_cache, get_session
 from lnkr.config import settings
@@ -35,5 +37,9 @@ async def forward_to_target_url_endpoint(
     except SlugDoesNotExistError as slug_does_not_exist_error:
         slug_does_not_exist_error.raise_http_exception()
 
-    await create_click(session, ClickCreate(ip_address=x_client_ip), cached_link.id)
+    try:
+        await create_click(session, ClickCreate(ip_address=x_client_ip), cached_link.id)
+    except SQLAlchemyError:
+        with suppress(SQLAlchemyError):
+            await session.rollback()
     return LinkForward(target_url=cached_link.target_url)

@@ -6,6 +6,8 @@ High level database operations for user management.
 
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import IntegrityError
+
 from lnkr.database import user_database
 from lnkr.exceptions import UserAlreadyExistsError, UserDoesNotExistError
 from lnkr.models import User, UserCreate
@@ -27,7 +29,10 @@ async def get_or_create_user(session: AsyncSession, user_create: UserCreate) -> 
     try:
         return await get_user(session, user_create.email)
     except UserDoesNotExistError:
-        return await _create_user(session, user_create)
+        try:
+            return await _create_user(session, user_create)
+        except UserAlreadyExistsError:
+            return await get_user(session, user_create.email)
 
 
 async def get_user(session: AsyncSession, email: str) -> User:
@@ -50,6 +55,8 @@ async def get_user(session: AsyncSession, email: str) -> User:
 
 
 async def _create_user(session: AsyncSession, user_create: UserCreate) -> User:
-    if await user_database.get_user_by_email(session, user_create.email) is not None:
-        raise UserAlreadyExistsError(email=user_create.email)
-    return await user_database.add_user(session, User.from_user_create(user_create))
+    try:
+        return await user_database.add_user(session, User.from_user_create(user_create))
+    except IntegrityError as integrity_error:
+        await session.rollback()
+        raise UserAlreadyExistsError(email=user_create.email) from integrity_error

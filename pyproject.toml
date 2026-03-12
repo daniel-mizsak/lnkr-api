@@ -6,7 +6,7 @@
 # Project Metadata
 [project]
   name = "lnkr-api"
-  version = "0.2.1"
+  version = "0.3.1"
   description = "Link manager REST API."
   authors = [{ name = "Daniel Mizsak", email = "info@pythonvilag.hu" }]
   requires-python = ">=3.14"

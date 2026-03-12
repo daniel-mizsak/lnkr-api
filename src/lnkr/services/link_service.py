@@ -6,6 +6,8 @@ High level database operations for link management.
 
 from typing import TYPE_CHECKING, Literal
 
+from sqlalchemy.exc import IntegrityError
+
 from lnkr.cache import link_cache
 from lnkr.config import settings
 from lnkr.database import link_database
@@ -37,13 +39,17 @@ async def create_link(session: AsyncSession, link_create: LinkCreate, user: User
     Returns:
         Link: Link object.
     """
-    # TODO: Maybe use IntergrityError to make sure there is no race condition when creating a link with the same slug.
     if await link_database.get_link_by_slug(session, link_create.slug) is not None:
         raise SlugAlreadyExistsError(slug=link_create.slug)
 
     if await link_database.count_links_by_user(session, user) >= settings.USER_LINK_LIMIT:
         raise UserLinkLimitExceededError(email=user.email, user_link_limit=settings.USER_LINK_LIMIT)
-    return await link_database.add_link(session, Link.from_link_create(link_create, user))
+
+    try:
+        return await link_database.add_link(session, Link.from_link_create(link_create, user))
+    except IntegrityError as integrity_error:
+        await session.rollback()
+        raise SlugAlreadyExistsError(slug=link_create.slug) from integrity_error
 
 
 async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> LinkCache:
@@ -119,8 +125,9 @@ async def update_link_target_url(
     """
     link = await get_link_validate_user(session, slug, user)
     link.update_from_link_update(link_update)
+    link = await link_database.add_link(session, link)
     await link_cache.delete_cached_link_by_slug(cache, slug)
-    return await link_database.add_link(session, link)
+    return link
 
 
 async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User) -> None:
@@ -137,8 +144,8 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         SlugNotOwnedByUserError: If the slug is not owned by the user.
     """
     link = await get_link_validate_user(session, slug, user)
-    await link_cache.delete_cached_link_by_slug(cache, slug)
     await link_database.delete_link(session, link)
+    await link_cache.delete_cached_link_by_slug(cache, slug)
 
 
 async def list_links(  # noqa: PLR0913

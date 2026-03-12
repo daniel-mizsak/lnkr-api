@@ -55,6 +55,12 @@ async def list_links_by_user(  # noqa: PLR0913
     sort_column = Link.created_at if sort == "created_at" else Link.updated_at
     order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
 
-    statement = select(Link).where(Link.user_id == user.id).order_by(order_clause).offset(offset).limit(per_page)
+    statement = (
+        select(Link)
+        .where(Link.user_id == user.id)
+        .order_by(order_clause, Link.id.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
     result = await session.execute(statement)
     return list(result.scalars().all())

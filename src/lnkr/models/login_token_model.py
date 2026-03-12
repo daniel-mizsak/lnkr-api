@@ -28,6 +28,7 @@ class LoginToken(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[EmailStr] = mapped_column(String(64), nullable=False)
+    # TODO: Make token_hash unique and retry while generating if there is a collision.
     token_hash: Mapped[str] = mapped_column(String, index=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -37,7 +38,7 @@ class LoginToken(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # TODO: Maybe store additional info like IP address, user agent, etc.
+    # TODO: Store additional info like IP address, user agent, etc.
 
     @property
     def is_valid(self) -> bool:

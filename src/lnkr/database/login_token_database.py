@@ -24,5 +24,9 @@ async def add_login_token(session: AsyncSession, login_token: LoginToken) -> Log
 
 async def get_login_token_by_token_hash(session: AsyncSession, token_hash: str) -> LoginToken | None:
     """Get login token from database by token hash."""
-    result = await session.execute(select(LoginToken).where(LoginToken.token_hash == token_hash).limit(1))
+    result = await session.execute(
+        select(LoginToken)
+        .where(LoginToken.token_hash == token_hash)
+        .order_by(LoginToken.created_at.desc(), LoginToken.id.desc())
+    )
     return result.scalars().first()

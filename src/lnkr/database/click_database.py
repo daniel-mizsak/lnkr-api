@@ -26,7 +26,11 @@ async def list_clicks_by_link(session: AsyncSession, link: Link, per_page: int, 
     """List all clicks for a link."""
     offset = (page - 1) * per_page
     statement = (
-        select(Click).where(Click.link_id == link.id).order_by(Click.timestamp.desc()).offset(offset).limit(per_page)
+        select(Click)
+        .where(Click.link_id == link.id)
+        .order_by(Click.timestamp.desc(), Click.id.desc())
+        .offset(offset)
+        .limit(per_page)
     )
     result = await session.execute(statement)
     return list(result.scalars().all())
