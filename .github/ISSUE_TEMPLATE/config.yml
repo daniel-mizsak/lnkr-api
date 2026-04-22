@@ -1,0 +1,12 @@
+---
+# https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository#configuring-the-template-chooser
+
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://daniel-mizsak.github.io/python-package-template/
+    about: Check the documentation before opening an issue.
+
+  - name: PyPA Code of Conduct
+    url: https://www.pypa.io/en/latest/code-of-conduct/
+    about: Read and follow the PyPA Code of Conduct.

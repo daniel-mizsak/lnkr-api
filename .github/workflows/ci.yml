@@ -1,0 +1,48 @@
+---
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: "0 12 * * 6" # Every Saturday at 12:00
+  workflow_call:
+    inputs:
+      package-version:
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prek:
+    permissions:
+      contents: read
+    uses: daniel-mizsak/workflows/.github/workflows/prek.yml@1a10f29ef1289f7f1c82e896f9307e701b6c7a77 # v2.1.0
+
+  lint:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: daniel-mizsak/workflows/.github/workflows/lint.yml@1a10f29ef1289f7f1c82e896f9307e701b6c7a77 # v2.1.0
+    with:
+      megalinter-config: "./.github/linters/.megalinter.yml"
+
+  ci:
+    permissions:
+      contents: read
+      id-token: write
+    uses: daniel-mizsak/workflows/.github/workflows/python-ci.yml@1a10f29ef1289f7f1c82e896f9307e701b6c7a77 # v2.1.0
+    with:
+      package-version: ${{ inputs.package-version }}
+      python-version: "3.12"
+      coverage: true
+      codecov: true
+      documentation: true
+      package: true
