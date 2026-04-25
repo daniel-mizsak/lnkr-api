@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+BACKUP_DIRECTORY="/backup"
+RETENTION_DAYS=14
+POSTGRES_CONTAINER_NAME="postgres"
+APPLICATION_DATABASE_NAME="{{ application_name }}"
+DOCKER_BINARY="$(command -v docker)"
+TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
+
+DATABASE_BACKUP_FILE="${BACKUP_DIRECTORY}/${APPLICATION_DATABASE_NAME}_${TIMESTAMP}.dump"
+
+# If pg_dump fails mid-stream, a corrupt/incomplete file remains.
+# TODO: Write to a temporary file first, then rename atomically on success to ensure only valid backups exist.
+
+"$DOCKER_BINARY" exec "$POSTGRES_CONTAINER_NAME" pg_dump \
+    --username=postgres \
+    --dbname="$APPLICATION_DATABASE_NAME" \
+    --format=custom \
+    --compress=6 > "$DATABASE_BACKUP_FILE"
+
+echo "Backed up: $APPLICATION_DATABASE_NAME -> $DATABASE_BACKUP_FILE"
+
+# Prune old database backups.
+find "$BACKUP_DIRECTORY" -type f \
+    -name "${APPLICATION_DATABASE_NAME}_*.dump" \
+    -mtime "+${RETENTION_DAYS}" \
+    -delete
+
+echo "Pruned ${APPLICATION_DATABASE_NAME} backups older than ${RETENTION_DAYS} days"
+
+# Backup globals.
+"$DOCKER_BINARY" exec "$POSTGRES_CONTAINER_NAME" pg_dumpall \
+    --username=postgres \
+    --globals-only > "${BACKUP_DIRECTORY}/globals_${TIMESTAMP}.sql"
+
+echo "Backed up globals"
+
+# Prune old globals backups.
+find "$BACKUP_DIRECTORY" -type f \
+    -name "globals_*.sql" \
+    -mtime "+${RETENTION_DAYS}" \
+    -delete
+
+echo "Pruned globals backups older than ${RETENTION_DAYS} days"

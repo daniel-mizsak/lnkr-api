@@ -1,0 +1,38 @@
+# Project
+.git
+.github
+deployment
+tests
+.pre-commit-config.yaml
+Justfile
+LICENSE
+README.md
+
+# System
+.DS_Store
+
+# Development files
+.ansible
+.artifacts
+.cache
+.coverage
+.pytest_cache
+.ruff_cache
+coverage.xml
+htmlcov
+megalinter-reports
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Environments
+.env
+.venv
+
+# IDE
+.vscode

@@ -1,20 +1,21 @@
 # Project
+deployment/ansible/inventory.ini
 
 # System
 .DS_Store
 
 # Development files
+.ansible
 .artifacts
 .cache
 .coverage
-.nox
 .pytest_cache
 .ruff_cache
 coverage.xml
 htmlcov
 megalinter-reports
 
-# Generated files
+# Python-generated files
 __pycache__/
 *.py[oc]
 build/

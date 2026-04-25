@@ -9,10 +9,6 @@ on:
   schedule:
     - cron: "0 12 * * 6" # Every Saturday at 12:00
   workflow_call:
-    inputs:
-      package-version:
-        required: false
-        type: string
 
 permissions: {}
 
@@ -40,9 +36,5 @@ jobs:
       id-token: write
     uses: daniel-mizsak/workflows/.github/workflows/python-ci.yml@1a10f29ef1289f7f1c82e896f9307e701b6c7a77 # v2.1.0
     with:
-      package-version: ${{ inputs.package-version }}
-      python-version: "3.12"
       coverage: true
       codecov: true
-      documentation: true
-      package: true

@@ -1,0 +1,45 @@
+---
+# yaml-language-server: $schema=https://www.schemastore.org/traefik-v3.json
+# Configure traefik.
+# Documentation:
+#   - https://doc.traefik.io/traefik/reference/static-configuration/cli/
+#   - https://doc.traefik.io/traefik/providers/swarm/
+
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+api:
+  dashboard: false
+
+ping: {}
+
+log:
+  level: INFO
+
+entryPoints:
+  web:
+    address: :80
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+  websecure:
+    address: :443
+    http:
+      tls:
+        certResolver: production
+
+certificatesResolvers:
+  production:
+    acme:
+      email: daniel@mizsak.com
+      storage: /etc/traefik/certs/acme.json
+      tlsChallenge: {}
+
+providers:
+  swarm:
+    exposedByDefault: false
+    network: traefik
+  file:
+    directory: /etc/traefik/dynamic

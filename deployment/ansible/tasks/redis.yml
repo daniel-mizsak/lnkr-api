@@ -1,0 +1,35 @@
+---
+- name: Create redis directory
+  ansible.builtin.file:
+    path: /deploy/redis
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Copy redis to host
+  ansible.builtin.copy:
+    src: redis/
+    dest: /deploy/redis
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0644"
+
+- name: Create redis network
+  community.docker.docker_network:
+    name: redis
+    state: present
+    driver: overlay
+    driver_options:
+      encrypted: "true"
+    attachable: true
+
+- name: Start redis container
+  community.docker.docker_compose_v2:
+    project_src: /deploy/redis
+    state: present
+    wait: true
+    wait_timeout: 30
+  environment:
+    REDIS_IMAGE: "{{ lookup('env', 'REDIS_IMAGE') }}"
+    REDIS_PASSWORD: "{{ lookup('env', 'REDIS_PASSWORD') }}"

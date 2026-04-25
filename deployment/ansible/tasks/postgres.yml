@@ -1,0 +1,77 @@
+---
+- name: Install psycopg2
+  ansible.builtin.apt:
+    package:
+      - python3-psycopg2
+    state: present
+
+- name: Create postgres directory
+  ansible.builtin.file:
+    path: /deploy/postgres
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Copy postgres to host
+  ansible.builtin.copy:
+    src: postgres/
+    dest: /deploy/postgres
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0644"
+
+- name: Create postgres network
+  community.docker.docker_network:
+    name: postgres
+    state: present
+    driver: overlay
+    driver_options:
+      encrypted: "true"
+    attachable: true
+
+- name: Start postgres container
+  community.docker.docker_compose_v2:
+    project_src: /deploy/postgres
+    state: present
+    wait: true
+    wait_timeout: 30
+  environment:
+    POSTGRES_IMAGE: "{{ lookup('env', 'POSTGRES_IMAGE') }}"
+    POSTGRES_PASSWORD_ROOT: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+
+- name: Create postgres application user
+  community.postgresql.postgresql_user:
+    name: "{{ application_name }}"
+    password: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+    login_host: "127.0.0.1"
+    login_port: "5432"
+    login_user: "postgres"
+    login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+    state: present
+
+- name: Create postgres application database
+  community.postgresql.postgresql_db:
+    name: "{{ application_name }}"
+    owner: "{{ application_name }}"
+    login_host: "127.0.0.1"
+    login_port: "5432"
+    login_user: "postgres"
+    login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+    state: present
+
+- name: Add database backup script
+  ansible.builtin.template:
+    src: postgres/database-backup.sh.j2
+    dest: /usr/local/bin/database-backup.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Schedule daily postgres backup
+  ansible.builtin.cron:
+    name: "postgres backup"
+    minute: "0"
+    hour: "2"
+    user: "{{ application_user_name }}"
+    job: /usr/local/bin/database-backup.sh
