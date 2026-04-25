@@ -5,43 +5,53 @@
 
 # Project Metadata
 [project]
-  name = "python-package-template-pypi" # Name has to be unique on pypi.
-  version = "0.0.0" # Version set by GitHub release.
-  description = "Python package template configuration."
-  readme = "README.md"
-  license = { file = "LICENSE" }
+  name = "lnkr-api"
+  version = "0.0.0"
+  description = "Link manager REST API."
   authors = [{ name = "Daniel Mizsak", email = "daniel@mizsak.com" }]
-  keywords = ["python", "template", "package", "github", "pypi"]
-  classifiers = [
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
+  requires-python = ">=3.14"
+  dependencies = [
+    "PyJWT==2.12.1",
+    "SQLAlchemy[asyncio]==2.0.49",
+    "alembic[tz]==1.18.4",
+    "fastapi[standard]==0.135.3",
+    "httpx==0.28.1",
+    "psycopg[binary]==3.3.3",
+    "pydantic-settings==2.13.1",
+    "redis==7.4.0",
+    "sentry-sdk==2.57.0",
   ]
-  requires-python = ">=3.12"
-  dependencies = ["numpy>=2.4.4"]
 
   [project.urls]
-    Repository = "https://github.com/daniel-mizsak/python-package-template/"
-    Documentation = "https://daniel-mizsak.github.io/python-package-template/"
-    Issues = "https://github.com/daniel-mizsak/python-package-template/issues/"
+    Homepage = "https://api.lnkr.by"
+    Repository = "https://github.com/daniel-mizsak/lnkr-api"
 
 [dependency-groups]
   dev = [
+    { include-group = "lint" },
+    "ansible-lint==26.4.0",
+    "beautifulsoup4==4.14.3",
     "coverage==7.13.5",
-    "nox==2026.4.10",
+    "fakeredis==2.34.1",
     "prek==0.3.9",
+    "pytest-asyncio==1.3.0",
     "pytest==9.0.3",
-    "ruff==0.15.10",
+    "testcontainers[postgres]==4.14.2",
     "ty==0.0.29",
   ]
-  docs = ["zensical==0.0.32", "mkdocstrings-python==2.0.3"]
+  lint = ["ruff==0.15.9"]
+  deployment = ["ansible==13.5.0"]
 
 # Tools
+# Pytest
+[tool.pytest.ini_options]
+  asyncio_mode = "auto"
+  testpaths = ["tests"]
+
 # Uv
 [tool.uv]
   exclude-newer = "1 week"
 
   [tool.uv.build-backend]
     module-root = "src"
-    module-name = "python_package_template"
+    module-name = "lnkr"

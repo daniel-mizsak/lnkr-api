@@ -1,0 +1,29 @@
+---
+services:
+  traefik:
+    image: traefik:v3.6.13
+    container_name: traefik
+    restart: unless-stopped
+    networks:
+      - traefik
+      - redis
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/etc/traefik/certs
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+
+networks:
+  traefik:
+    external: true
+  redis:
+    external: true

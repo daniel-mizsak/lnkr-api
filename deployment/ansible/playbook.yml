@@ -1,0 +1,49 @@
+---
+- name: Deploy lnkr-api application
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    application_name: "lnkr-api"
+    application_user_name: "ansible"
+
+  handlers:
+    - name: Restart docker
+      ansible.builtin.service:
+        name: docker
+        state: restarted
+
+  pre_tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Create deploy directory
+      ansible.builtin.file:
+        path: /deploy
+        owner: "{{ application_user_name }}"
+        group: "{{ application_user_name }}"
+        mode: "0755"
+        state: directory
+
+    - name: Import docker tasks
+      ansible.builtin.import_tasks:
+        file: tasks/docker.yml
+
+    - name: Import postgres tasks
+      ansible.builtin.import_tasks:
+        file: tasks/postgres.yml
+
+    - name: Import redis tasks
+      ansible.builtin.import_tasks:
+        file: tasks/redis.yml
+
+    - name: Import traefik tasks
+      ansible.builtin.import_tasks:
+        file: tasks/traefik.yml
+
+    - name: Import lnkr tasks
+      ansible.builtin.import_tasks:
+        file: tasks/lnkr.yml

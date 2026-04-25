@@ -1,0 +1,56 @@
+---
+- name: Install docker dependencies
+  ansible.builtin.apt:
+    package:
+      - ca-certificates
+      - curl
+      - gnupg
+      - python3-debian
+    state: present
+
+- name: Add docker repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    architectures: amd64
+    uris: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}"
+    signed_by: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+    suites: ["{{ ansible_facts['distribution_release'] | lower }}"]
+    components: [stable]
+    state: present
+    enabled: true
+
+- name: Install docker engine
+  ansible.builtin.apt:
+    package:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    update_cache: true
+    state: present
+
+- name: Service docker is started and enabled
+  ansible.builtin.systemd_service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add application user to docker group
+  ansible.builtin.user:
+    name: "{{ application_user_name }}"
+    append: true
+    groups:
+      - docker
+
+- name: Install python packages for docker swarm
+  ansible.builtin.apt:
+    package:
+      - python3-docker
+      - python3-jsondiff
+    state: present
+
+- name: Initialize docker swarm
+  community.docker.docker_swarm:
+    state: present

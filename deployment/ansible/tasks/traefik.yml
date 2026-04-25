@@ -1,0 +1,62 @@
+---
+- name: Create traefik directory
+  ansible.builtin.file:
+    path: /deploy/traefik
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Copy traefik to host
+  ansible.builtin.copy:
+    src: traefik/
+    dest: /deploy/traefik
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0644"
+
+- name: Create traefik certificate directory
+  ansible.builtin.file:
+    path: /deploy/traefik/certs
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Create traefik dynamic configuration directory
+  ansible.builtin.file:
+    path: /deploy/traefik/dynamic
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Add dynamic traefik rate limit configuration
+  ansible.builtin.template:
+    src: traefik/ratelimit.toml.j2
+    dest: /deploy/traefik/dynamic/ratelimit.toml
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0600"
+  vars:
+    redis_host: "{{ lookup('env', 'REDIS_HOST') }}"
+    redis_port: "{{ lookup('env', 'REDIS_PORT') }}"
+    redis_username: "{{ lookup('env', 'REDIS_USERNAME') }}"
+    redis_password: "{{ lookup('env', 'REDIS_PASSWORD') }}"
+    redis_database_traefik: "{{ lookup('env', 'REDIS_DATABASE_TRAEFIK') }}"
+
+- name: Create traefik network
+  community.docker.docker_network:
+    name: traefik
+    state: present
+    driver: overlay
+    driver_options:
+      encrypted: "true"
+    attachable: true
+
+- name: Start traefik container
+  community.docker.docker_compose_v2:
+    project_src: /deploy/traefik
+    state: present
+    wait: true
+    wait_timeout: 30

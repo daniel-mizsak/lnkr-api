@@ -1,0 +1,21 @@
+[http.middlewares]
+
+  [http.middlewares.lnkr-general-ratelimit.rateLimit]
+    average = 60
+    burst = 120
+    period = "1m"
+    [http.middlewares.lnkr-general-ratelimit.rateLimit.redis]
+      endpoints = ["{{ redis_host }}:{{ redis_port }}"]
+      username = "{{ redis_username }}"
+      password = "{{ redis_password }}"
+      db = {{ redis_database_traefik | int }}
+
+  [http.middlewares.lnkr-auth-ratelimit.rateLimit]
+    average = 6
+    burst = 12
+    period = "1m"
+    [http.middlewares.lnkr-auth-ratelimit.rateLimit.redis]
+      endpoints = ["{{ redis_host }}:{{ redis_port }}"]
+      username = "{{ redis_username }}"
+      password = "{{ redis_password }}"
+      db = {{ redis_database_traefik | int }}

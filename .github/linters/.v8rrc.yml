@@ -1,0 +1,14 @@
+---
+customCatalog:
+  schemas:
+    - name: Traefik v3
+      description: Traefik v3 configuration
+      fileMatch:
+        - deployment/ansible/files/traefik/traefik.yml
+      location: https://www.schemastore.org/traefik-v3.json
+
+    - name: Ansible Task
+      description: Ansible Task configuration
+      fileMatch:
+        - deployment/ansible/tasks/*.yml
+      location: https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks
