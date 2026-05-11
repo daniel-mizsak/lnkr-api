@@ -35,6 +35,8 @@ class ApplicationSettings(BaseSettings):
     ACCESS_TOKEN_SECRET_KEY: SecretStr
     ACCESS_TOKEN_ALGORITHM: str = "HS256"  # noqa: S105
 
+    FRONTEND_API_KEY: SecretStr
+
     LINK_CACHE_TTL_SECONDS: int = 60 * 60 * 24  # 24 hours
 
     SENTRY_DSN: SecretStr | None = None

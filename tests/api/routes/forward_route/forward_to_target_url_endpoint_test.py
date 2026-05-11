@@ -6,6 +6,7 @@ Tests for the forward to target url endpoint.
 
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import status
 
 from lnkr.config.application_settings import application_settings
@@ -48,13 +49,11 @@ def test_forward_to_target_url__ip_address(client: TestClient, slug: str, target
     client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": "192.168.1.1", "X-Forwarded-For": "192.168.1.2"},
+        headers={"X-Client-IP": "192.168.1.1"},
     )
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={
-            "X-Forwarded-For": "192.168.1.3, 192.168.1.4",
-        },
+        headers={"X-Client-IP": "not-an-ip"},
     )
 
     response = client.get(
@@ -64,4 +63,28 @@ def test_forward_to_target_url__ip_address(client: TestClient, slug: str, target
 
     assert response.status_code == status.HTTP_200_OK
     assert len(data) == 3
-    assert [item["ip_address"] for item in data] == ["192.168.1.3", "192.168.1.1", None]
+    assert [item["ip_address"] for item in data] == [None, "192.168.1.1", None]
+
+
+@pytest.mark.usefixtures("override_check_frontend_api_key")
+def test_forward_to_target_url__ip_address_skipped_when_not_frontend(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={"X-Client-IP": "192.168.1.1"},
+    )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
+    )
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["ip_address"] is None

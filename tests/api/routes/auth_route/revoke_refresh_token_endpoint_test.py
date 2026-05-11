@@ -6,12 +6,26 @@ Tests for the revoke refresh token endpoint.
 
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import status
 
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+
+
+@pytest.mark.usefixtures("override_verify_frontend_api_key")
+def test_revoke_refresh_token__missing_frontend_api_key(client: TestClient) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/revoke-refresh-token",
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    error = data["detail"][0]
+    assert error["msg"] == "The provided frontend api key is invalid"
+    assert error["type"] == "frontend_api_key_invalid"
 
 
 def test_revoke_refresh_token__refresh_token_invalid(client: TestClient) -> None:

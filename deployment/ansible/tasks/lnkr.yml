@@ -45,6 +45,7 @@
     APPLICATION_NAME: "{{ application_name }}"
     ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
     ACCESS_TOKEN_SECRET_KEY: "{{ lookup('env', 'ACCESS_TOKEN_SECRET_KEY') }}"
+    FRONTEND_API_KEY: "{{ lookup('env', 'FRONTEND_API_KEY') }}"
     SENTRY_DSN: "{{ lookup('env', 'SENTRY_DSN') }}"
 
     POSTGRES_HOST: "{{ lookup('env', 'POSTGRES_HOST') }}"
