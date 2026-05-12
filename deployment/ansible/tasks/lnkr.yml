@@ -15,6 +15,29 @@
     group: "{{ application_user_name }}"
     mode: "0644"
 
+- name: Verify required environment variables are set
+  ansible.builtin.assert:
+    that: lookup('env', item) | length > 0
+    fail_msg: "Required environment variable {{ item }} is not set or is empty"
+    quiet: true
+  loop:
+    - ENVIRONMENT
+    - ACCESS_TOKEN_SECRET_KEY
+    - FRONTEND_API_KEY
+    - SENTRY_DSN
+    - POSTGRES_HOST
+    - POSTGRES_PORT
+    - POSTGRES_PASSWORD
+    - REDIS_HOST
+    - REDIS_PORT
+    - REDIS_USERNAME
+    - REDIS_PASSWORD
+    - REDIS_DATABASE_APPLICATION
+    - SMTP_HOST
+    - SMTP_PORT
+    - SMTP_USER
+    - SMTP_PASSWORD
+
 - name: Run database migrations
   community.docker.docker_container:
     name: "{{ application_name }}-database-migration"

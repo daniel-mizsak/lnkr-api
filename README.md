@@ -62,7 +62,6 @@ just deploy-development
 - Remove old login tokens with a scheduled cleanup task.
 - When creating login token store additional info like IP address, user agent, etc.
 - Improve rate limiting.
-- Validate required environment variables in ansible playbook.
 - Automatic deployment to production when GitHub release is created.
 - Add more in-depth logging.
 - No 3rd party service for sending emails. Self-hosted SMTP server.
