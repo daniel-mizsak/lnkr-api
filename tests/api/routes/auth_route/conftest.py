@@ -11,9 +11,13 @@ import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
 
+from lnkr.api.dependencies import verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
+from lnkr.main import app
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from fastapi.testclient import TestClient
 
 
@@ -50,3 +54,13 @@ def issued_auth_tokens_fixture(client: TestClient, issued_login_token: str) -> d
     )
     assert response.status_code == status.HTTP_200_OK
     return response.json()
+
+
+@pytest.fixture()
+def override_verify_frontend_api_key(client: TestClient) -> Generator[None]:  # noqa: ARG001
+    # Depend on `client` so this fixture runs after the default override is installed,
+    # then pop it so the real dependency runs and raises on the missing header.
+    original_frontend_api_key = app.dependency_overrides.pop(verify_frontend_api_key, None)
+    yield
+    if original_frontend_api_key is not None:
+        app.dependency_overrides[verify_frontend_api_key] = original_frontend_api_key

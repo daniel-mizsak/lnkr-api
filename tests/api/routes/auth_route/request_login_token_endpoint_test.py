@@ -6,6 +6,7 @@ Tests for the request login token endpoint.
 
 from typing import TYPE_CHECKING
 
+import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
 
@@ -15,6 +16,19 @@ if TYPE_CHECKING:
     from unittest.mock import AsyncMock
 
     from fastapi.testclient import TestClient
+
+
+@pytest.mark.usefixtures("override_verify_frontend_api_key")
+def test_request_login_token__missing_frontend_api_key(client: TestClient) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    error = data["detail"][0]
+    assert error["msg"] == "The provided frontend api key is invalid"
+    assert error["type"] == "frontend_api_key_invalid"
 
 
 def test_request_login_token__success(client: TestClient, mock_send_email: AsyncMock, email: str) -> None:

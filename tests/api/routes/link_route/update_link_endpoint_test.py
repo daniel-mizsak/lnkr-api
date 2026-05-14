@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
     from lnkr.models import User
-    from tests.api.conftest import OverrideUserFunction
+    from tests.api.conftest import OverrideGetCurrentUserFunction
 
 
 def test_update_link__invalid_target_url(client: TestClient, slug: str, target_url_invalid: str) -> None:
@@ -49,7 +49,7 @@ def test_update_link__slug_does_not_exist(client: TestClient, slug: str, target_
 
 def test_update_link__slug_not_owned_by_user(
     client: TestClient,
-    override_current_user: OverrideUserFunction,
+    override_get_current_user: OverrideGetCurrentUserFunction,
     other_user: User,
     slug: str,
     target_url: str,
@@ -59,7 +59,7 @@ def test_update_link__slug_not_owned_by_user(
         json={"slug": slug, "target_url": target_url},
     )
 
-    override_current_user(other_user)
+    override_get_current_user(other_user)
     response = client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": f"{target_url}/1"},

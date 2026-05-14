@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.templating import Jinja2Templates
 
-from lnkr.api.dependencies import get_session
+from lnkr.api.dependencies import get_session, verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import LoginTokenInvalidError, RefreshTokenInvalidError, UserDoesNotExistError
 from lnkr.models import (
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 email_templates = Jinja2Templates(directory="templates/email")
 
 
-router = APIRouter(prefix=application_settings.AUTH_PREFIX)
+router = APIRouter(prefix=application_settings.AUTH_PREFIX, dependencies=[Depends(verify_frontend_api_key)])
 
 
 @router.post("/request-login-token")

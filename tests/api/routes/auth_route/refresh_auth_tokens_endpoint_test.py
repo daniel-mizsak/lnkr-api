@@ -6,6 +6,7 @@ Tests for the refresh auth tokens endpoint.
 
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import status
 
 from lnkr.config.application_settings import application_settings
@@ -15,6 +16,19 @@ if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
     from lnkr.models import User
+
+
+@pytest.mark.usefixtures("override_verify_frontend_api_key")
+def test_refresh_auth_tokens__missing_frontend_api_key(client: TestClient) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/refresh-auth-tokens",
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    error = data["detail"][0]
+    assert error["msg"] == "The provided frontend api key is invalid"
+    assert error["type"] == "frontend_api_key_invalid"
 
 
 def test_refresh_auth_tokens__refresh_token_invalid(client: TestClient) -> None:

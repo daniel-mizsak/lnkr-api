@@ -13,7 +13,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from lnkr.api.dependencies import get_cache, get_current_user, get_session
+from lnkr.api.dependencies import (
+    check_frontend_api_key,
+    get_cache,
+    get_current_user,
+    get_session,
+    verify_frontend_api_key,
+)
 from lnkr.main import app
 from lnkr.models import User
 from lnkr.models.base import Base
@@ -49,6 +55,8 @@ def client_fixture(session: AsyncSession, user: User) -> Iterator[TestClient]:
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_cache] = lambda: fake_async_redis
+    app.dependency_overrides[verify_frontend_api_key] = lambda: None
+    app.dependency_overrides[check_frontend_api_key] = lambda: True
 
     client = TestClient(app)
     try:
@@ -58,18 +66,17 @@ def client_fixture(session: AsyncSession, user: User) -> Iterator[TestClient]:
         app.dependency_overrides.clear()
 
 
-OverrideUserFunction = Callable[[User], None]
-OverrideUserFixture = Generator[OverrideUserFunction]
+OverrideGetCurrentUserFunction = Callable[[User], None]
+OverrideGetCurrentUserFixture = Generator[OverrideGetCurrentUserFunction]
 
 
 @pytest.fixture()
-def override_current_user() -> OverrideUserFixture:
+def override_get_current_user() -> OverrideGetCurrentUserFixture:
     original_user = app.dependency_overrides.get(get_current_user)
 
     def _override(user: User) -> None:
         app.dependency_overrides[get_current_user] = lambda: user
 
     yield _override
-
     if original_user is not None:
         app.dependency_overrides[get_current_user] = original_user

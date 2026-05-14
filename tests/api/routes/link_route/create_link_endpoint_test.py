@@ -23,14 +23,6 @@ if TYPE_CHECKING:
     from lnkr.models import Link, LinkCreate, User
 
 
-@pytest.fixture
-def _override_user_link_limit() -> Generator[None]:
-    original_limit = application_settings.USER_LINK_LIMIT
-    application_settings.USER_LINK_LIMIT = 1
-    yield
-    application_settings.USER_LINK_LIMIT = original_limit
-
-
 def test_create_link__invalid_slug(client: TestClient, target_url: str) -> None:
     # min_length
     slug_invalid = "slg"
@@ -172,6 +164,14 @@ def test_create_link__user_link_limit_exceeded(client: TestClient, email: str, s
     error = data["detail"][0]
     assert error["msg"] == f"User '{email}' exceeds their link limit of 1"
     assert error["type"] == "user_link_limit_exceeded"
+
+
+@pytest.fixture
+def _override_user_link_limit() -> Generator[None]:
+    original_limit = application_settings.USER_LINK_LIMIT
+    application_settings.USER_LINK_LIMIT = 1
+    yield
+    application_settings.USER_LINK_LIMIT = original_limit
 
 
 def test_create_link__success(client: TestClient, slug: str, target_url: str) -> None:

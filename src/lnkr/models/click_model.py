@@ -47,6 +47,7 @@ class Click(Base):
         default=lambda: datetime.now(tz=UTC),
         nullable=False,
     )
+    # 45 is the length of IPv4-mapped IPv6 addresses.
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
 
     link_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("links.id", ondelete="CASCADE"), index=True)

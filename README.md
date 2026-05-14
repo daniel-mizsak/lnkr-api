@@ -54,15 +54,14 @@ just deploy-development
 
 ### Future improvements
 
+- Add tests covering api dependencies.
 - Use `async` API calls in tests.
 - Add direct forwarding (redirect) option.
-- Improve IP tracking during link forwarding.
 - Add callback URL to request login token endpoint and attach to login_url.
 - Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.
 - When creating login token store additional info like IP address, user agent, etc.
 - Improve rate limiting.
-- Validate required environment variables in ansible playbook.
 - Automatic deployment to production when GitHub release is created.
 - Add more in-depth logging.
 - No 3rd party service for sending emails. Self-hosted SMTP server.

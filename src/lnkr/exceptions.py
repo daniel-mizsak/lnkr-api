@@ -16,6 +16,27 @@ class LnkrError(Exception):
     """Base exception for all lnkr errors."""
 
 
+class FrontendApiKeyInvalidError(LnkrError):
+    """Raised when the frontend api key is invalid."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        msg = "The provided frontend api key is invalid"
+        super().__init__(msg)
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "frontend_api_key_invalid",
+                },
+            ],
+        )
+
+
 class LoginTokenInvalidError(LnkrError):
     """Raised when a login token is invalid, used or expired."""
 
