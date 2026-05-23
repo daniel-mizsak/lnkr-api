@@ -56,7 +56,6 @@ just deploy-development
 
 - Add tests covering api dependencies.
 - Use `async` API calls in tests.
-- Add direct forwarding (redirect) option.
 - Add callback URL to request login token endpoint and attach to login_url.
 - Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.
@@ -66,6 +65,7 @@ just deploy-development
 - Add more in-depth logging.
 - No 3rd party service for sending emails. Self-hosted SMTP server.
 - Update email template based on the look of the frontend and update button's link.
+- Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
 
 <hr>
 

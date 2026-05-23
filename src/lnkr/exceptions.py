@@ -221,3 +221,47 @@ class SlugNotOwnedByUserError(LnkrError):
                 },
             ],
         )
+
+
+class LinkExpiredError(LnkrError):
+    """Raised when a link has passed its expiration date."""
+
+    def __init__(self, slug: str) -> None:
+        """Initialize with default error message."""
+        msg = f"Link with slug '{slug}' has expired"
+        super().__init__(msg)
+        self.slug = slug
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "link_expired",
+                },
+            ],
+        )
+
+
+class LinkDisabledError(LnkrError):
+    """Raised when a link is disabled by the user."""
+
+    def __init__(self, slug: str) -> None:
+        """Initialize with default error message."""
+        msg = f"Link with slug '{slug}' is disabled"
+        super().__init__(msg)
+        self.slug = slug
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "link_disabled",
+                },
+            ],
+        )

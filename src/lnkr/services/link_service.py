@@ -5,6 +5,7 @@ High level services for link management.
 """
 
 import contextlib
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
 
 from redis.exceptions import RedisError
@@ -14,13 +15,15 @@ from lnkr.cache import link_cache
 from lnkr.config.application_settings import application_settings
 from lnkr.database import link_database, user_database
 from lnkr.exceptions import (
+    LinkDisabledError,
+    LinkExpiredError,
     SlugAlreadyExistsError,
     SlugDoesNotExistError,
     SlugNotOwnedByUserError,
     UserDoesNotExistError,
     UserLinkLimitExceededError,
 )
-from lnkr.models import Link, LinkCache, LinkCreate, LinkUpdate, User
+from lnkr.models import Link, LinkCache, LinkCreate, LinkStatus, LinkUpdate, User
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -62,13 +65,17 @@ async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> Lin
     except RedisError:
         cached_link = None
 
-    if cached_link is not None:
-        return cached_link
+    if cached_link is None:
+        link = await _get_link(session, slug)
+        cached_link = LinkCache.from_link(link)
+        with contextlib.suppress(RedisError):
+            await link_cache.add_cached_link(cache, cached_link)
 
-    link = await _get_link(session, slug)
-    cached_link = LinkCache.from_link(link)
-    with contextlib.suppress(RedisError):
-        await link_cache.add_cached_link(cache, cached_link)
+    if cached_link.status == LinkStatus.DISABLED:
+        raise LinkDisabledError(slug=cached_link.slug)
+    if cached_link.expires_at is not None and cached_link.expires_at <= datetime.now(tz=UTC):
+        raise LinkExpiredError(slug=cached_link.slug)
+
     return cached_link
 
 
@@ -87,10 +94,8 @@ async def _get_link(session: AsyncSession, slug: str) -> Link:
     return link
 
 
-async def update_link_target_url(
-    session: AsyncSession, cache: Redis, slug: str, link_update: LinkUpdate, user: User
-) -> Link:
-    """Update the target url of a link in the database."""
+async def update_link(session: AsyncSession, cache: Redis, slug: str, link_update: LinkUpdate, user: User) -> Link:
+    """Apply a partial update to a link in the database."""
     link = await get_link_validate_user(session, slug, user)
     link.update_from_link_update(link_update)
 
@@ -103,7 +108,7 @@ async def update_link_target_url(
         raise
 
     with contextlib.suppress(RedisError):
-        # TODO: Make link cache invalidation reliable so stale link targets are not served after update.
+        # TODO: Make link cache invalidation reliable so stale link data is not served after update.
         await link_cache.delete_cached_link_by_slug(cache, slug)
     return link
 

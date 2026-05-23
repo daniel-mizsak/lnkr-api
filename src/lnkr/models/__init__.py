@@ -5,7 +5,7 @@ Data schemas and database models.
 """
 
 from lnkr.models.click_model import Click, ClickCreate, ClickRead
-from lnkr.models.link_model import Link, LinkCache, LinkCreate, LinkForward, LinkRead, LinkUpdate
+from lnkr.models.link_model import Link, LinkCache, LinkCreate, LinkForward, LinkRead, LinkStatus, LinkUpdate
 from lnkr.models.tokens import AuthTokensRead
 from lnkr.models.tokens.access_token_model import AccessTokenPayload
 from lnkr.models.tokens.login_token_model import LoginToken, LoginTokenCreate, LoginTokenVerify
@@ -23,6 +23,7 @@ __all__ = [
     "LinkCreate",
     "LinkForward",
     "LinkRead",
+    "LinkStatus",
     "LinkUpdate",
     "LoginToken",
     "LoginTokenCreate",

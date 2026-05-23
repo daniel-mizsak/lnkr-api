@@ -64,9 +64,11 @@ def test_get_link__success(client: TestClient, slug: str, target_url: str) -> No
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert set(data.keys()) == {"slug", "target_url", "created_at", "updated_at"}
+    assert set(data.keys()) == {"slug", "target_url", "status", "expires_at", "created_at", "updated_at"}
     assert data["slug"] == slug
     assert data["target_url"] == target_url
+    assert data["status"] == "active"
+    assert data["expires_at"] is None
 
     now = datetime.now(UTC)
     created_at = datetime.fromisoformat(data["created_at"])
