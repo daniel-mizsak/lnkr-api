@@ -23,7 +23,7 @@ from lnkr.services.link_service import (
     delete_link,
     get_link_validate_user,
     list_links,
-    update_link_target_url,
+    update_link,
 )
 
 if TYPE_CHECKING:
@@ -75,9 +75,9 @@ async def update_link_endpoint(
     cache: Annotated[Redis, Depends(get_cache)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
-    """Update the target url of a link."""
+    """Update link."""
     try:
-        link = await update_link_target_url(session, cache, slug, link_update, user)
+        link = await update_link(session, cache, slug, link_update, user)
     except SlugDoesNotExistError as slug_does_not_exist_error:
         slug_does_not_exist_error.raise_http_exception()
     except SlugNotOwnedByUserError as slug_not_owned_by_user_error:

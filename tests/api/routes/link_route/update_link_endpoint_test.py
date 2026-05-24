@@ -4,6 +4,7 @@ Tests for the update link endpoint.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi import status
@@ -74,14 +75,49 @@ def test_update_link__slug_not_owned_by_user(
     assert error["type"] == "slug_not_owned_by_user"
 
 
-def test_update_link__success(client: TestClient, slug: str, target_url: str) -> None:
-    response = client.post(
+def test_update_link__unknown_field_rejected(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"taget_url": target_url},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["loc"] == ["body", "taget_url"]
+    assert error["type"] == "extra_forbidden"
+
+
+def test_update_link__empty_body_rejected(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["input"] == {}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == "Value error, At least one field must be provided"
+    assert error["type"] == "value_error"
+
+
+def test_update_link__target_url(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": f"{target_url}/1"},
     )
-    data = response.json()
-    original_created_at = data["created_at"]
-    original_updated_at = data["updated_at"]
 
     response = client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
@@ -90,9 +126,157 @@ def test_update_link__success(client: TestClient, slug: str, target_url: str) ->
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert set(data.keys()) == {"slug", "target_url", "created_at", "updated_at"}
-    assert data["slug"] == slug
     assert data["target_url"] == target_url
 
+
+def test_update_link__cannot_clear_target_url(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"target_url": None},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["input"] == {"target_url": None}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == "Value error, target_url cannot be cleared"
+    assert error["type"] == "value_error"
+
+
+def test_update_link__status(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": "disabled"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["status"] == "disabled"
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": "active"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["status"] == "active"
+
+
+def test_update_link__cannot_clear_status(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": None},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["input"] == {"status": None}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == "Value error, status cannot be cleared"
+    assert error["type"] == "value_error"
+
+
+def test_update_link__expires_at(client: TestClient, slug: str, target_url: str, future_expires_at: datetime) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": future_expires_at.isoformat()},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert datetime.fromisoformat(data["expires_at"]) == future_expires_at
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": None},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["expires_at"] is None
+
+
+def test_update_link__expires_at_aware_datetime(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": "2026-12-31T12:00:00"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["loc"] == ["body", "expires_at"]
+    assert error["msg"] == "Input should have timezone info"
+    assert error["type"] == "timezone_aware"
+
+
+def test_update_link__created_at(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    data = response.json()
+    original_created_at = data["created_at"]
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"target_url": f"{target_url}/1"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
     assert data["created_at"] == original_created_at
+
+
+def test_update_link__updated_at(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    data = response.json()
+    original_updated_at = data["updated_at"]
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"target_url": f"{target_url}/1"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
     assert data["updated_at"] > original_updated_at

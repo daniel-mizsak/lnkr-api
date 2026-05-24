@@ -12,6 +12,8 @@ from fastapi import status
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from fastapi.testclient import TestClient
 
 
@@ -27,7 +29,11 @@ def test_forward_to_target_url__slug_does_not_exist(client: TestClient, slug: st
     assert error["type"] == "slug_does_not_exist"
 
 
-def test_forward_to_target_url__success(client: TestClient, slug: str, target_url: str) -> None:
+def test_forward_to_target_url__success(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -86,5 +92,70 @@ def test_forward_to_target_url__ip_address_skipped_when_not_frontend(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
     )
     data = response.json()
+
     assert len(data) == 1
     assert data[0]["ip_address"] is None
+
+
+def test_forward_to_target_url__disabled(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": "disabled"},
+    )
+
+    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    data = response.json()
+
+    assert response.status_code == status.HTTP_410_GONE
+    error = data["detail"][0]
+    assert error["type"] == "link_disabled"
+
+
+def test_forward_to_target_url__expired(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    past_expires_at: datetime,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": past_expires_at.isoformat()},
+    )
+
+    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    data = response.json()
+
+    assert response.status_code == status.HTTP_410_GONE
+    error = data["detail"][0]
+    assert error["type"] == "link_expired"
+
+
+def test_forward_to_target_url__extending_expiry_revives_link(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    past_expires_at: datetime,
+    future_expires_at: datetime,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": past_expires_at.isoformat()},
+    )
+
+    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    assert response.status_code == status.HTTP_410_GONE
+
+    client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": future_expires_at.isoformat()},
+    )
+
+    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["target_url"] == target_url

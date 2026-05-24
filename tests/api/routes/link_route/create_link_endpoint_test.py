@@ -174,7 +174,26 @@ def _override_user_link_limit() -> Generator[None]:
     application_settings.USER_LINK_LIMIT = original_limit
 
 
-def test_create_link__success(client: TestClient, slug: str, target_url: str) -> None:
+def test_create_link__unknown_field_rejected(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    future_expires_at: datetime,
+) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_a": future_expires_at.isoformat()},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["loc"] == ["body", "expires_a"]
+    assert error["msg"] == "Extra inputs are not permitted"
+    assert error["type"] == "extra_forbidden"
+
+
+def test_create_link__expires_at_not_set(client: TestClient, slug: str, target_url: str) -> None:
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -182,9 +201,23 @@ def test_create_link__success(client: TestClient, slug: str, target_url: str) ->
     data = response.json()
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert set(data.keys()) == {"slug", "target_url", "created_at", "updated_at"}
+    assert data["status"] == "active"
+    assert data["expires_at"] is None
+
+
+def test_create_link__success(client: TestClient, slug: str, target_url: str, future_expires_at: datetime) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": future_expires_at.isoformat()},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert set(data.keys()) == {"slug", "target_url", "status", "expires_at", "created_at", "updated_at"}
     assert data["slug"] == slug
     assert data["target_url"] == target_url
+    assert data["status"] == "active"
+    assert datetime.fromisoformat(data["expires_at"]) == future_expires_at
 
     now = datetime.now(UTC)
     created_at = datetime.fromisoformat(data["created_at"])

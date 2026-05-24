@@ -49,7 +49,11 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(128), index=True, unique=True, nullable=False)
-    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.REGULAR)
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, name="user_status"),
+        default=UserStatus.REGULAR,
+        nullable=False,
+    )
     links: Mapped[list[Link]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     @classmethod
