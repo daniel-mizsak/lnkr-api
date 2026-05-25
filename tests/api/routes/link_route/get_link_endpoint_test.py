@@ -64,7 +64,15 @@ def test_get_link__success(client: TestClient, slug: str, target_url: str) -> No
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert set(data.keys()) == {"slug", "target_url", "status", "expires_at", "created_at", "updated_at"}
+    assert set(data.keys()) == {
+        "slug",
+        "target_url",
+        "status",
+        "expires_at",
+        "password_protected",
+        "created_at",
+        "updated_at",
+    }
     assert data["slug"] == slug
     assert data["target_url"] == target_url
     assert data["status"] == "active"

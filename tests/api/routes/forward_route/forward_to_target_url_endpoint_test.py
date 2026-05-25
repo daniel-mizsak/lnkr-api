@@ -134,6 +134,34 @@ def test_forward_to_target_url__expired(
     assert error["type"] == "link_expired"
 
 
+def test_forward_to_target_url__password(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    password: str,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "password": password},
+    )
+
+    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    data = response.json()
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.headers["Cache-Control"] == "no-store"
+    error = data["detail"][0]
+    assert error["msg"] == f"Link with slug '{slug}' requires a password"
+    assert error["type"] == "link_password_required"
+
+    # No click recorded.
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == []
+
+
 def test_forward_to_target_url__extending_expiry_revives_link(
     client: TestClient,
     slug: str,

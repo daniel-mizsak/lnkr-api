@@ -21,6 +21,11 @@ services:
         - "traefik.http.routers.lnkr-auth.priority=20"
         - "traefik.http.routers.lnkr-auth.middlewares=lnkr-auth-ratelimit@file"
 
+        - "traefik.http.routers.lnkr-forward-unlock.rule=Host(`api.lnkr.by`) && PathRegexp(`^/v1/forward/[^/]+/unlock$`) && Method(`POST`)"
+        - "traefik.http.routers.lnkr-forward-unlock.entrypoints=websecure"
+        - "traefik.http.routers.lnkr-forward-unlock.priority=20"
+        - "traefik.http.routers.lnkr-forward-unlock.middlewares=lnkr-forward-unlock-ratelimit@file"
+
       mode: replicated
       replicas: 3
       update_config:
