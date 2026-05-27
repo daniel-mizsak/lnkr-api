@@ -13,10 +13,16 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from lnkr.api.dependencies import check_frontend_api_key, get_cache, get_session
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import LinkDisabledError, LinkExpiredError, SlugDoesNotExistError
-from lnkr.models import ClickCreate, LinkForward
+from lnkr.exceptions import (
+    LinkDisabledError,
+    LinkExpiredError,
+    LinkPasswordInvalidError,
+    LinkPasswordRequiredError,
+    SlugDoesNotExistError,
+)
+from lnkr.models import ClickCreate, LinkForward, LinkUnlock
 from lnkr.services.click_service import create_click
-from lnkr.services.link_service import get_cached_link
+from lnkr.services.link_service import get_cached_link, get_cached_link_validate_password
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -55,6 +61,37 @@ async def forward_to_target_url_endpoint(
         link_disabled_error.raise_http_exception()
     except LinkExpiredError as link_expired_error:
         link_expired_error.raise_http_exception()
+
+    if cached_link.password_hash is not None:
+        LinkPasswordRequiredError(slug=cached_link.slug).raise_http_exception()
+
+    with suppress(SQLAlchemyError):
+        await create_click(session, ClickCreate(ip_address=ip_address), cached_link.id)
+
+    return LinkForward(target_url=cached_link.target_url)
+
+
+@router.post("/{slug}/unlock")
+async def unlock_target_url_endpoint(  # noqa: PLR0913
+    slug: str,
+    link_unlock: LinkUnlock,
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    cache: Annotated[Redis, Depends(get_cache)],
+    ip_address: Annotated[str | None, Depends(_get_ip_address)],
+) -> LinkForward:
+    """Return the target url of the link with the given slug if the provided password is correct."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        cached_link = await get_cached_link_validate_password(session, cache, slug, link_unlock.password)
+    except SlugDoesNotExistError as slug_does_not_exist_error:
+        slug_does_not_exist_error.raise_http_exception()
+    except LinkDisabledError as link_disabled_error:
+        link_disabled_error.raise_http_exception()
+    except LinkExpiredError as link_expired_error:
+        link_expired_error.raise_http_exception()
+    except LinkPasswordInvalidError as link_password_invalid_error:
+        link_password_invalid_error.raise_http_exception()
 
     with suppress(SQLAlchemyError):
         await create_click(session, ClickCreate(ip_address=ip_address), cached_link.id)

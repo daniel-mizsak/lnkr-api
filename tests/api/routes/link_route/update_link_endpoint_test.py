@@ -238,6 +238,57 @@ def test_update_link__expires_at_aware_datetime(client: TestClient, slug: str, t
     assert error["type"] == "timezone_aware"
 
 
+def test_update_link__password(client: TestClient, slug: str, target_url: str, password: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"password": password},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["password_protected"] is True
+
+    # Change password
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"password": f"new-{password}"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["password_protected"] is True
+
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+        json={"password": password},
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+        json={"password": f"new-{password}"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["target_url"] == target_url
+
+    # Clear password
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"password": None},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["password_protected"] is False
+
+
 def test_update_link__created_at(
     client: TestClient,
     slug: str,

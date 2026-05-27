@@ -41,6 +41,11 @@ def target_url_invalid_fixture() -> str:
     return "example.com/"
 
 
+@pytest.fixture(name="password")
+def password_fixture() -> str:
+    return "password"
+
+
 @pytest.fixture(name="future_expires_at")
 def future_expires_at_fixture() -> datetime:
     return datetime.now(UTC) + timedelta(days=1)

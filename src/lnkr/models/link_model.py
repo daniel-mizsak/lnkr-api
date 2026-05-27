@@ -7,10 +7,10 @@ Data schemas and database models for link management.
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lnkr.models.base import Base
@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 
 MAX_TARGET_URL_LENGTH = 1024
+
+LinkPassword = Annotated[str, Field(min_length=1, max_length=32)]
 
 
 class LinkStatus(StrEnum):
@@ -42,6 +44,7 @@ class LinkCreate(BaseModel):
     )
     target_url: HttpUrl = Field(max_length=MAX_TARGET_URL_LENGTH)
     expires_at: AwareDatetime | None = Field(default=None, json_schema_extra={"examples": [None]})
+    password: LinkPassword | None = Field(default=None, json_schema_extra={"examples": [None]})
 
 
 class LinkRead(BaseModel):
@@ -51,6 +54,7 @@ class LinkRead(BaseModel):
     target_url: str
     status: LinkStatus
     expires_at: AwareDatetime | None
+    password_protected: bool
     created_at: datetime
     updated_at: datetime
 
@@ -62,6 +66,7 @@ class LinkRead(BaseModel):
             target_url=link.target_url,
             status=link.status,
             expires_at=link.expires_at,
+            password_protected=link.password_hash is not None,
             created_at=link.created_at,
             updated_at=link.updated_at,
         )
@@ -75,6 +80,7 @@ class LinkUpdate(BaseModel):
     target_url: HttpUrl | None = Field(default=None, max_length=MAX_TARGET_URL_LENGTH)
     expires_at: AwareDatetime | None = None
     status: LinkStatus | None = None
+    password: LinkPassword | None = None
 
     @model_validator(mode="after")
     def _validate_partial_update(self) -> LinkUpdate:
@@ -98,6 +104,7 @@ class LinkCache(BaseModel):
     target_url: str
     status: LinkStatus
     expires_at: AwareDatetime | None
+    password_hash: str | None
 
     @classmethod
     def from_link(cls, link: Link) -> LinkCache:
@@ -108,7 +115,14 @@ class LinkCache(BaseModel):
             target_url=link.target_url,
             status=link.status,
             expires_at=link.expires_at,
+            password_hash=link.password_hash,
         )
+
+
+class LinkUnlock(BaseModel):
+    """Link schema for unlocking a password protected link for forwarding."""
+
+    password: LinkPassword
 
 
 class LinkForward(BaseModel):
@@ -131,6 +145,7 @@ class Link(Base):
         nullable=False,
     )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(tz=UTC),
@@ -153,16 +168,17 @@ class Link(Base):
     clicks: Mapped[list[Click]] = relationship(back_populates="link", cascade="all, delete-orphan")
 
     @classmethod
-    def from_link_create(cls, link_create: LinkCreate, user: User) -> Link:
+    def from_link_create(cls, link_create: LinkCreate, user: User, password_hash: str | None = None) -> Link:
         """Create a Link instance from a LinkCreate instance."""
         return cls(
             slug=link_create.slug,
             target_url=str(link_create.target_url),
             expires_at=link_create.expires_at,
+            password_hash=password_hash,
             user=user,
         )
 
-    def update_from_link_update(self, link_update: LinkUpdate) -> None:
+    def update_from_link_update(self, link_update: LinkUpdate, password_hash: str | None = None) -> None:
         """Apply a partial update to the Link instance."""
         fields_set = link_update.model_fields_set
         if "target_url" in fields_set and link_update.target_url is not None:
@@ -171,3 +187,5 @@ class Link(Base):
             self.expires_at = link_update.expires_at
         if "status" in fields_set and link_update.status is not None:
             self.status = link_update.status
+        if "password" in fields_set:
+            self.password_hash = password_hash

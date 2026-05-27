@@ -201,23 +201,53 @@ def test_create_link__expires_at_not_set(client: TestClient, slug: str, target_u
     data = response.json()
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert data["status"] == "active"
     assert data["expires_at"] is None
 
 
-def test_create_link__success(client: TestClient, slug: str, target_url: str, future_expires_at: datetime) -> None:
+def test_create_link__password_not_set(client: TestClient, slug: str, target_url: str) -> None:
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": future_expires_at.isoformat()},
+        json={"slug": slug, "target_url": target_url},
     )
     data = response.json()
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert set(data.keys()) == {"slug", "target_url", "status", "expires_at", "created_at", "updated_at"}
+    assert data["password_protected"] is False
+
+
+def test_create_link__success(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    future_expires_at: datetime,
+    password: str,
+) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={
+            "slug": slug,
+            "target_url": target_url,
+            "expires_at": future_expires_at.isoformat(),
+            "password": password,
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert set(data.keys()) == {
+        "slug",
+        "target_url",
+        "status",
+        "expires_at",
+        "password_protected",
+        "created_at",
+        "updated_at",
+    }
     assert data["slug"] == slug
     assert data["target_url"] == target_url
     assert data["status"] == "active"
     assert datetime.fromisoformat(data["expires_at"]) == future_expires_at
+    assert data["password_protected"] is True
 
     now = datetime.now(UTC)
     created_at = datetime.fromisoformat(data["created_at"])

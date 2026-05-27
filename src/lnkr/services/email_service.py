@@ -4,9 +4,10 @@ High level services for email management.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-import asyncio
 import smtplib
 from typing import TYPE_CHECKING
+
+from anyio import to_thread
 
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 async def send_email(message: MIMEMultipart) -> None:
     """Send an email without blocking the event loop."""
-    await asyncio.to_thread(_send_email_sync, message)
+    await to_thread.run_sync(_send_email_sync, message)
 
 
 def _send_email_sync(message: MIMEMultipart) -> None:

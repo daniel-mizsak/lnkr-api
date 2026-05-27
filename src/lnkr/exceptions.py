@@ -11,6 +11,8 @@ from fastapi import HTTPException, status
 if TYPE_CHECKING:
     import uuid
 
+NO_STORE_HEADERS = {"Cache-Control": "no-store"}
+
 
 class LnkrError(Exception):
     """Base exception for all lnkr errors."""
@@ -242,6 +244,53 @@ class LinkExpiredError(LnkrError):
                     "type": "link_expired",
                 },
             ],
+            headers=NO_STORE_HEADERS,
+        )
+
+
+class LinkPasswordRequiredError(LnkrError):
+    """Raised when a link requires a password to be forwarded."""
+
+    def __init__(self, slug: str) -> None:
+        """Initialize with default error message."""
+        msg = f"Link with slug '{slug}' requires a password"
+        super().__init__(msg)
+        self.slug = slug
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "link_password_required",
+                },
+            ],
+            headers=NO_STORE_HEADERS,
+        )
+
+
+class LinkPasswordInvalidError(LnkrError):
+    """Raised when an invalid password is provided for a password protected link."""
+
+    def __init__(self, slug: str) -> None:
+        """Initialize with default error message."""
+        msg = f"The provided password for link with slug '{slug}' is invalid"
+        super().__init__(msg)
+        self.slug = slug
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "link_password_invalid",
+                },
+            ],
+            headers=NO_STORE_HEADERS,
         )
 
 

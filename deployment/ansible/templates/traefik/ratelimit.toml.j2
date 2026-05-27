@@ -19,3 +19,13 @@
       username = "{{ redis_username }}"
       password = "{{ redis_password }}"
       db = {{ redis_database_traefik | int }}
+
+  [http.middlewares.lnkr-forward-unlock-ratelimit.rateLimit]
+    average = 12
+    burst = 24
+    period = "1m"
+    [http.middlewares.lnkr-forward-unlock-ratelimit.rateLimit.redis]
+      endpoints = ["{{ redis_host }}:{{ redis_port }}"]
+      username = "{{ redis_username }}"
+      password = "{{ redis_password }}"
+      db = {{ redis_database_traefik | int }}
