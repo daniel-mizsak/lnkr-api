@@ -103,7 +103,7 @@ async def delete_link_endpoint(
 
 
 @router.get("")
-async def list_links_endpoint(  # noqa: PLR0913
+async def list_links_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
     sort: Annotated[Literal["created_at", "updated_at"], Query()] = "updated_at",

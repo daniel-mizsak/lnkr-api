@@ -33,6 +33,10 @@ upgrade-ansible:
     uv run ansible-galaxy collection install --requirements-file requirements.yml --upgrade
 
 [group("lifecycle")]
+geoip-update:
+    op run --env-file="deployment/.env.production" --no-masking -- ./scripts/update-geoip-database.sh
+
+[group("lifecycle")]
 fresh: clean install
 
 [group("qa")]

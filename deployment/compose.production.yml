@@ -6,6 +6,8 @@ services:
       - traefik
       - postgres
       - redis
+    volumes:
+      - "/deploy/applications/${APPLICATION_NAME}/geoip:/app/geoip:ro"
     deploy:
       labels:
         - "traefik.enable=true"

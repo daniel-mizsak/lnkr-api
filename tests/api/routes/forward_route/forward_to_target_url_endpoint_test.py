@@ -46,7 +46,15 @@ def test_forward_to_target_url__success(
     assert data["target_url"] == target_url
 
 
-def test_forward_to_target_url__ip_address(client: TestClient, slug: str, target_url: str) -> None:
+def test_forward_to_target_url__click_metadata(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    ip_address_public: str,
+    ip_address_public_country_code: str,
+    ip_address_private: str,
+    ip_address_malformed: str,
+) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -55,11 +63,15 @@ def test_forward_to_target_url__ip_address(client: TestClient, slug: str, target
     client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": "192.168.1.1"},
+        headers={"X-Client-IP": ip_address_public},
     )
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": "not-an-ip"},
+        headers={"X-Client-IP": ip_address_private},
+    )
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={"X-Client-IP": ip_address_malformed},
     )
 
     response = client.get(
@@ -68,8 +80,11 @@ def test_forward_to_target_url__ip_address(client: TestClient, slug: str, target
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(data) == 3
-    assert [item["ip_address"] for item in data] == [None, "192.168.1.1", None]
+    assert len(data) == 4
+    # Clicks are returned most recent first: malformed, private, public, then no IP.
+    # Only the globally routable address (and its resolved country) is stored.
+    assert [item["ip_address"] for item in data] == [None, None, ip_address_public, None]
+    assert [item["country_code"] for item in data] == [None, None, ip_address_public_country_code, None]
 
 
 @pytest.mark.usefixtures("override_check_frontend_api_key")
@@ -119,11 +134,11 @@ def test_forward_to_target_url__expired(
     client: TestClient,
     slug: str,
     target_url: str,
-    past_expires_at: datetime,
+    expires_at_past: datetime,
 ) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": past_expires_at.isoformat()},
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at_past.isoformat()},
     )
 
     response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
@@ -166,12 +181,12 @@ def test_forward_to_target_url__extending_expiry_revives_link(
     client: TestClient,
     slug: str,
     target_url: str,
-    past_expires_at: datetime,
-    future_expires_at: datetime,
+    expires_at_past: datetime,
+    expires_at_future: datetime,
 ) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": past_expires_at.isoformat()},
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at_past.isoformat()},
     )
 
     response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
@@ -179,7 +194,7 @@ def test_forward_to_target_url__extending_expiry_revives_link(
 
     client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": future_expires_at.isoformat()},
+        json={"expires_at": expires_at_future.isoformat()},
     )
 
     response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")

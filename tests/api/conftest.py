@@ -6,6 +6,7 @@ Fixtures used in testing the api.
 
 import os
 from collections.abc import AsyncGenerator, Callable, Generator, Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from fakeredis import FakeAsyncRedis
@@ -17,12 +18,16 @@ from lnkr.api.dependencies import (
     check_frontend_api_key,
     get_cache,
     get_current_user,
+    get_geoip_reader,
     get_session,
     verify_frontend_api_key,
 )
 from lnkr.main import app
 from lnkr.models import User
 from lnkr.models.base import Base
+
+if TYPE_CHECKING:
+    from geoip2.database import Reader
 
 
 # TODO: Use `async` API calls in tests.
@@ -37,24 +42,25 @@ async def engine_fixture() -> AsyncGenerator[AsyncEngine]:
 
 
 @pytest.fixture(name="session")
-async def session_fixture(engine: AsyncEngine, user: User, other_user: User) -> AsyncGenerator[AsyncSession]:
+async def session_fixture(engine: AsyncEngine, user: User, user_other: User) -> AsyncGenerator[AsyncSession]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
-        session.add_all([user, other_user])
+        session.add_all([user, user_other])
         await session.commit()
         yield session
 
 
 @pytest.fixture(name="client")
-def client_fixture(session: AsyncSession, user: User) -> Iterator[TestClient]:
+def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> Iterator[TestClient]:
     fake_async_redis = FakeAsyncRedis(decode_responses=True)
 
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_cache] = lambda: fake_async_redis
+    app.dependency_overrides[get_geoip_reader] = lambda: geoip_reader
     app.dependency_overrides[verify_frontend_api_key] = lambda: None
     app.dependency_overrides[check_frontend_api_key] = lambda: True
 

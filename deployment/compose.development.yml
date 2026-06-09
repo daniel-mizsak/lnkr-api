@@ -34,6 +34,7 @@ services:
           action: rebuild
     volumes:
       - "../alembic/versions:/app/alembic/versions"
+      - "../geoip:/app/geoip:ro"
     ports:
       - "8000:8000"
     environment:

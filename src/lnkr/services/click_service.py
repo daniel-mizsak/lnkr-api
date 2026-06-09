@@ -10,16 +10,24 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from lnkr.database import click_database
 from lnkr.models import Click, ClickCreate, Link
+from lnkr.services.geoip_service import get_country_code_from_ip
 
 if TYPE_CHECKING:
     import uuid
 
+    from geoip2.database import Reader
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def create_click(session: AsyncSession, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
+async def create_click(
+    session: AsyncSession,
+    geoip_reader: Reader,
+    click_create: ClickCreate,
+    link_id: uuid.UUID,
+) -> Click:
     """Create a click in the database."""
-    click = Click.from_click_create(click_create, link_id)
+    country_code = get_country_code_from_ip(geoip_reader, click_create.ip_address)
+    click = Click.from_click_create(click_create, country_code, link_id)
 
     try:
         await click_database.save_click(session, click)

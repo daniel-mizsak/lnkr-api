@@ -70,5 +70,8 @@ class ApplicationSettings(BaseSettings):
     SMTP_PASSWORD: SecretStr
     FROM_EMAIL: str = "hello@lnkr.by"
 
+    # GeoIP
+    GEOIP_COUNTRY_DATABASE_PATH: str = "geoip/GeoLite2-Country.mmdb"
+
 
 application_settings = ApplicationSettings()  # ty:ignore[missing-argument]

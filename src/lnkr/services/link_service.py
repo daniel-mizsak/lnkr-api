@@ -153,7 +153,7 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         await link_cache.delete_cached_link_by_slug(cache, slug)
 
 
-async def list_links(  # noqa: PLR0913
+async def list_links(
     session: AsyncSession,
     user: User,
     sort: Literal["created_at", "updated_at"],

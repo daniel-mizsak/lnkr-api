@@ -51,7 +51,7 @@ def test_update_link__slug_does_not_exist(client: TestClient, slug: str, target_
 def test_update_link__slug_not_owned_by_user(
     client: TestClient,
     override_get_current_user: OverrideGetCurrentUserFunction,
-    other_user: User,
+    user_other: User,
     slug: str,
     target_url: str,
 ) -> None:
@@ -60,7 +60,7 @@ def test_update_link__slug_not_owned_by_user(
         json={"slug": slug, "target_url": target_url},
     )
 
-    override_get_current_user(other_user)
+    override_get_current_user(user_other)
     response = client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": f"{target_url}/1"},
@@ -194,7 +194,7 @@ def test_update_link__cannot_clear_status(client: TestClient, slug: str, target_
     assert error["type"] == "value_error"
 
 
-def test_update_link__expires_at(client: TestClient, slug: str, target_url: str, future_expires_at: datetime) -> None:
+def test_update_link__expires_at(client: TestClient, slug: str, target_url: str, expires_at_future: datetime) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -202,12 +202,12 @@ def test_update_link__expires_at(client: TestClient, slug: str, target_url: str,
 
     response = client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": future_expires_at.isoformat()},
+        json={"expires_at": expires_at_future.isoformat()},
     )
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert datetime.fromisoformat(data["expires_at"]) == future_expires_at
+    assert datetime.fromisoformat(data["expires_at"]) == expires_at_future
 
     response = client.patch(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",

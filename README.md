@@ -22,6 +22,7 @@ Link manager REST API.
 - [SQLAlchemy](https://www.sqlalchemy.org) for the Python SQL database interactions (ORM).
 - [Alembic](https://alembic.sqlalchemy.org) for database migrations.
 - [Redis](https://redis.io) for caching.
+- [GeoLite2](https://www.maxmind.com) for IP-based geolocation.
 - [Pytest](https://pytest.org) for testing.
 - [Docker Compose](https://www.docker.com) for development and production.
 - [Resend](https://resend.com)'s SMTP for passwordless email-based registration.
@@ -59,7 +60,8 @@ just deploy-development
 - Add callback URL to request login token endpoint and attach to login_url.
 - Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.
-- When creating login token store additional info like IP address, user agent, etc.
+- Attach the client user agent (parsed OS and browser) to both the forward and request login token operations.
+- Add the originating location (country) to the login token email.
 - Improve rate limiting.
 - Automatic deployment to production when GitHub release is created.
 - Add more in-depth logging.
