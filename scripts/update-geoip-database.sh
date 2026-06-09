@@ -33,6 +33,8 @@ temporary_directory="$(mktemp --directory)"
 trap 'rm -rf "${temporary_directory}"' EXIT
 
 curl --fail --silent --show-error --location \
+    --connect-timeout 10 --max-time 300 \
+    --retry 3 --retry-delay 5 --retry-connrefused --retry-max-time 60 \
     --user "${GEOIP_ACCOUNT_ID}:${GEOIP_LICENSE_KEY}" \
     "https://download.maxmind.com/geoip/databases/${GEOIP_DATABASE_EDITION}/download?suffix=tar.gz" |
     tar --extract --gzip --strip-components=1 --directory "${temporary_directory}"

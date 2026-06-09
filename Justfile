@@ -98,7 +98,6 @@ database-migration message:
 [group("deploy")]
 [working-directory("./deployment")]
 deploy-development up="up":
-    {{ if up == "up" { "just geoip-update &&" } else { "" } }} \
     source ./.env.common && \
     source ./.env.development && \
     docker compose --file compose.development.yml {{ up }} \

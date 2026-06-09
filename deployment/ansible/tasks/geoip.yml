@@ -34,6 +34,16 @@
       GEOIP_LICENSE_KEY={{ lookup('env', 'GEOIP_LICENSE_KEY') }}
   no_log: true
 
+- name: Run geoip database update script
+  ansible.builtin.command:
+    cmd: /usr/local/bin/update-geoip-database.sh
+    chdir: /deploy/applications/{{ application_name }}
+    creates: /deploy/applications/{{ application_name }}/geoip/GeoLite2-Country.mmdb
+  become: true
+  become_user: "{{ application_user_name }}"
+  environment:
+    GEOIP_CREDENTIALS: /home/{{ application_user_name }}/.config/geoip/credentials.env
+
 - name: Schedule weekly geoip database update
   ansible.builtin.cron:
     name: "geoip database update"

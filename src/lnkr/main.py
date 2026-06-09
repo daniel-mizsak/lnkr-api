@@ -48,6 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         f"{application_settings.REDIS_DATABASE_APPLICATION}",
         decode_responses=True,
     )
+    # TODO: Do not fail app startup if the GeoIP database is not available.
     app.state.geoip_reader = geoip2.database.Reader(application_settings.GEOIP_COUNTRY_DATABASE_PATH)
 
     yield
