@@ -32,7 +32,7 @@ def test_delete_link__slug_does_not_exist(client: TestClient, slug: str) -> None
 def test_delete_link__slug_not_owned_by_user(
     client: TestClient,
     override_get_current_user: OverrideGetCurrentUserFunction,
-    other_user: User,
+    user_other: User,
     slug: str,
     target_url: str,
 ) -> None:
@@ -41,7 +41,7 @@ def test_delete_link__slug_not_owned_by_user(
         json={"slug": slug, "target_url": target_url},
     )
 
-    override_get_current_user(other_user)
+    override_get_current_user(user_other)
     response = client.delete(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}")
     data = response.json()
 

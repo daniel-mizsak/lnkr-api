@@ -165,7 +165,7 @@ def test_unlock_target_url__expired(
     slug: str,
     target_url: str,
     password: str,
-    past_expires_at: datetime,
+    expires_at_past: datetime,
 ) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
@@ -173,7 +173,7 @@ def test_unlock_target_url__expired(
             "slug": slug,
             "target_url": target_url,
             "password": password,
-            "expires_at": past_expires_at.isoformat(),
+            "expires_at": expires_at_past.isoformat(),
         },
     )
 

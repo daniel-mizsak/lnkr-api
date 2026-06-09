@@ -2,6 +2,7 @@
 .git
 .github
 deployment
+geoip
 tests
 .pre-commit-config.yaml
 Justfile

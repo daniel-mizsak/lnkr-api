@@ -42,7 +42,7 @@ async def count_links_by_user(session: AsyncSession, user_id: uuid.UUID) -> int:
     return result.scalar_one()
 
 
-async def list_links_by_user(  # noqa: PLR0913
+async def list_links_by_user(
     session: AsyncSession,
     user: User,
     sort: Literal["created_at", "updated_at"],

@@ -33,6 +33,10 @@ upgrade-ansible:
     uv run ansible-galaxy collection install --requirements-file requirements.yml --upgrade
 
 [group("lifecycle")]
+geoip-update:
+    op run --env-file="deployment/.env.production" --no-masking -- ./scripts/update-geoip-database.sh
+
+[group("lifecycle")]
 fresh: clean install
 
 [group("qa")]
@@ -94,6 +98,7 @@ database-migration message:
 [group("deploy")]
 [working-directory("./deployment")]
 deploy-development up="up":
+    {{ if up == "up" { "just geoip-update &&" } else { "" } }} \
     source ./.env.common && \
     source ./.env.development && \
     docker compose --file compose.development.yml {{ up }} \

@@ -1,0 +1,47 @@
+---
+- name: Create geoip directory
+  ansible.builtin.file:
+    path: /deploy/applications/{{ application_name }}/geoip
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0755"
+    state: directory
+
+- name: Add geoip database update script
+  ansible.builtin.copy:
+    src: ./../../scripts/update-geoip-database.sh
+    dest: /usr/local/bin/update-geoip-database.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create geoip credentials directory
+  ansible.builtin.file:
+    path: /home/{{ application_user_name }}/.config/geoip
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0700"
+    state: directory
+
+- name: Add geoip credentials file
+  ansible.builtin.copy:
+    dest: /home/{{ application_user_name }}/.config/geoip/credentials.env
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0600"
+    content: |
+      GEOIP_ACCOUNT_ID={{ lookup('env', 'GEOIP_ACCOUNT_ID') }}
+      GEOIP_LICENSE_KEY={{ lookup('env', 'GEOIP_LICENSE_KEY') }}
+  no_log: true
+
+- name: Schedule weekly geoip database update
+  ansible.builtin.cron:
+    name: "geoip database update"
+    weekday: "3"
+    hour: "3"
+    minute: "0"
+    user: "{{ application_user_name }}"
+    job: >
+      cd /deploy/applications/{{ application_name }} &&
+      GEOIP_CREDENTIALS=/home/{{ application_user_name }}/.config/geoip/credentials.env
+      /usr/local/bin/update-geoip-database.sh

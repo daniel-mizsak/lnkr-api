@@ -29,11 +29,12 @@ class ClickRead(BaseModel):
 
     timestamp: datetime
     ip_address: str | None
+    country_code: str | None
 
     @classmethod
     def from_click(cls, click: Click) -> ClickRead:
         """Create a ClickRead instance from a Click instance."""
-        return cls(timestamp=click.timestamp, ip_address=click.ip_address)
+        return cls(timestamp=click.timestamp, ip_address=click.ip_address, country_code=click.country_code)
 
 
 class Click(Base):
@@ -49,6 +50,7 @@ class Click(Base):
     )
     # 45 is the length of IPv4-mapped IPv6 addresses.
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    country_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
 
     link_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -59,6 +61,6 @@ class Click(Base):
     link: Mapped[Link] = relationship(back_populates="clicks")
 
     @classmethod
-    def from_click_create(cls, click_create: ClickCreate, link_id: uuid.UUID) -> Click:
+    def from_click_create(cls, click_create: ClickCreate, country_code: str | None, link_id: uuid.UUID) -> Click:
         """Create a Click instance from a ClickCreate instance."""
-        return cls(ip_address=click_create.ip_address, link_id=link_id)
+        return cls(ip_address=click_create.ip_address, country_code=country_code, link_id=link_id)

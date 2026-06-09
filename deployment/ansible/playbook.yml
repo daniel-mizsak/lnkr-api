@@ -14,6 +14,33 @@
         state: restarted
 
   pre_tasks:
+    - name: Verify required environment variables are set
+      ansible.builtin.assert:
+        that: lookup('env', item) | length > 0
+        fail_msg: "Required environment variable {{ item }} is not set or is empty"
+        quiet: true
+      loop:
+        - ENVIRONMENT
+        - ACCESS_TOKEN_SECRET_KEY
+        - FRONTEND_API_KEY
+        - SENTRY_DSN
+        - POSTGRES_HOST
+        - POSTGRES_PORT
+        - POSTGRES_PASSWORD
+        - POSTGRES_PASSWORD_ROOT
+        - REDIS_HOST
+        - REDIS_PORT
+        - REDIS_USERNAME
+        - REDIS_PASSWORD
+        - REDIS_DATABASE_APPLICATION
+        - REDIS_DATABASE_TRAEFIK
+        - SMTP_HOST
+        - SMTP_PORT
+        - SMTP_USER
+        - SMTP_PASSWORD
+        - GEOIP_ACCOUNT_ID
+        - GEOIP_LICENSE_KEY
+
     - name: Update apt package cache
       ansible.builtin.apt:
         update_cache: true
@@ -23,6 +50,22 @@
     - name: Create deploy directory
       ansible.builtin.file:
         path: /deploy
+        owner: "{{ application_user_name }}"
+        group: "{{ application_user_name }}"
+        mode: "0755"
+        state: directory
+
+    - name: Create applications directory
+      ansible.builtin.file:
+        path: /deploy/applications
+        owner: "{{ application_user_name }}"
+        group: "{{ application_user_name }}"
+        mode: "0755"
+        state: directory
+
+    - name: Create lnkr directory
+      ansible.builtin.file:
+        path: /deploy/applications/{{ application_name }}
         owner: "{{ application_user_name }}"
         group: "{{ application_user_name }}"
         mode: "0755"
@@ -43,6 +86,10 @@
     - name: Import traefik tasks
       ansible.builtin.import_tasks:
         file: tasks/traefik.yml
+
+    - name: Import geoip tasks
+      ansible.builtin.import_tasks:
+        file: tasks/geoip.yml
 
     - name: Import lnkr tasks
       ansible.builtin.import_tasks:

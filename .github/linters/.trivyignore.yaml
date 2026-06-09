@@ -1,0 +1,10 @@
+---
+misconfigurations:
+  - id: AVD-DS-0002
+    paths:
+      - deployment/Dockerfile.development
+    statement: No need for non-root user in development image.
+  - id: AVD-DS-0026
+    paths:
+      - deployment/Dockerfile.development
+    statement: No need for a healthcheck in development image.

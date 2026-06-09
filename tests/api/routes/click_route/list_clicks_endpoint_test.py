@@ -35,7 +35,7 @@ def test_list_clicks__slug_does_not_exist(client: TestClient, slug: str) -> None
 def test_list_clicks__slug_not_owned_by_user(
     client: TestClient,
     override_get_current_user: OverrideGetCurrentUserFunction,
-    other_user: User,
+    user_other: User,
     slug: str,
     target_url: str,
 ) -> None:
@@ -44,7 +44,7 @@ def test_list_clicks__slug_not_owned_by_user(
         json={"slug": slug, "target_url": target_url},
     )
 
-    override_get_current_user(other_user)
+    override_get_current_user(user_other)
     response = client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
     )
@@ -73,7 +73,13 @@ def test_list_clicks__empty(client: TestClient, slug: str, target_url: str) -> N
     assert data == []
 
 
-def test_list_clicks__success(client: TestClient, slug: str, target_url: str) -> None:
+def test_list_clicks__success(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    ip_address_public: str,
+    ip_address_public_country_code: str,
+) -> None:
     timestamp = datetime.now(tz=UTC)
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
@@ -90,7 +96,7 @@ def test_list_clicks__success(client: TestClient, slug: str, target_url: str) ->
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
         headers={
-            "X-Client-IP": "192.168.1.1",
+            "X-Client-IP": ip_address_public,
         },
     )
 
@@ -106,5 +112,6 @@ def test_list_clicks__success(client: TestClient, slug: str, target_url: str) ->
     for item in data:
         item_timestamp = datetime.fromisoformat(item["timestamp"])
         assert timestamp < item_timestamp < timestamp + timedelta(seconds=1)
-        assert set(item.keys()) == {"ip_address", "timestamp"}
-    assert {item["ip_address"] for item in data} == {None, "192.168.1.1"}
+        assert set(item.keys()) == {"timestamp", "ip_address", "country_code"}
+    assert {item["ip_address"] for item in data} == {None, ip_address_public}
+    assert {item["country_code"] for item in data} == {None, ip_address_public_country_code}

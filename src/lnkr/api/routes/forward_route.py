@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.exc import SQLAlchemyError
 
-from lnkr.api.dependencies import check_frontend_api_key, get_cache, get_session
+from lnkr.api.dependencies import check_frontend_api_key, get_cache, get_geoip_reader, get_session
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import (
     LinkDisabledError,
@@ -25,6 +25,7 @@ from lnkr.services.click_service import create_click
 from lnkr.services.link_service import get_cached_link, get_cached_link_validate_password
 
 if TYPE_CHECKING:
+    from geoip2.database import Reader
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,9 +39,13 @@ def _get_ip_address(
     if not is_frontend or x_client_ip is None:
         return None
     try:
-        return str(ipaddress.ip_address(x_client_ip.strip()))
+        ip_address = ipaddress.ip_address(x_client_ip.strip())
     except ValueError:
         return None
+    # Only record clicks from globally routable addresses.
+    if not ip_address.is_global:
+        return None
+    return str(ip_address)
 
 
 @router.get("/{slug}")
@@ -49,6 +54,7 @@ async def forward_to_target_url_endpoint(
     response: Response,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
+    geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
     ip_address: Annotated[str | None, Depends(_get_ip_address)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug."""
@@ -66,18 +72,19 @@ async def forward_to_target_url_endpoint(
         LinkPasswordRequiredError(slug=cached_link.slug).raise_http_exception()
 
     with suppress(SQLAlchemyError):
-        await create_click(session, ClickCreate(ip_address=ip_address), cached_link.id)
+        await create_click(session, geoip_reader, ClickCreate(ip_address=ip_address), cached_link.id)
 
     return LinkForward(target_url=cached_link.target_url)
 
 
 @router.post("/{slug}/unlock")
-async def unlock_target_url_endpoint(  # noqa: PLR0913
+async def unlock_target_url_endpoint(
     slug: str,
     link_unlock: LinkUnlock,
     response: Response,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
+    geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
     ip_address: Annotated[str | None, Depends(_get_ip_address)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug if the provided password is correct."""
@@ -94,6 +101,6 @@ async def unlock_target_url_endpoint(  # noqa: PLR0913
         link_password_invalid_error.raise_http_exception()
 
     with suppress(SQLAlchemyError):
-        await create_click(session, ClickCreate(ip_address=ip_address), cached_link.id)
+        await create_click(session, geoip_reader, ClickCreate(ip_address=ip_address), cached_link.id)
 
     return LinkForward(target_url=cached_link.target_url)

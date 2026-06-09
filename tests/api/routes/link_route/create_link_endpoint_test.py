@@ -178,11 +178,11 @@ def test_create_link__unknown_field_rejected(
     client: TestClient,
     slug: str,
     target_url: str,
-    future_expires_at: datetime,
+    expires_at_future: datetime,
 ) -> None:
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_a": future_expires_at.isoformat()},
+        json={"slug": slug, "target_url": target_url, "expires_a": expires_at_future.isoformat()},
     )
     data = response.json()
 
@@ -219,7 +219,7 @@ def test_create_link__success(
     client: TestClient,
     slug: str,
     target_url: str,
-    future_expires_at: datetime,
+    expires_at_future: datetime,
     password: str,
 ) -> None:
     response = client.post(
@@ -227,7 +227,7 @@ def test_create_link__success(
         json={
             "slug": slug,
             "target_url": target_url,
-            "expires_at": future_expires_at.isoformat(),
+            "expires_at": expires_at_future.isoformat(),
             "password": password,
         },
     )
@@ -246,7 +246,7 @@ def test_create_link__success(
     assert data["slug"] == slug
     assert data["target_url"] == target_url
     assert data["status"] == "active"
-    assert datetime.fromisoformat(data["expires_at"]) == future_expires_at
+    assert datetime.fromisoformat(data["expires_at"]) == expires_at_future
     assert data["password_protected"] is True
 
     now = datetime.now(UTC)
