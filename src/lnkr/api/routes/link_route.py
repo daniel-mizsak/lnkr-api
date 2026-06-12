@@ -21,6 +21,7 @@ from lnkr.models import LinkCreate, LinkRead, LinkUpdate, User
 from lnkr.services.link_service import (
     create_link,
     delete_link,
+    generate_link_qr_code,
     get_link_validate_user,
     list_links,
     update_link,
@@ -65,6 +66,39 @@ async def get_link_endpoint(
     except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
         slug_not_owned_by_user_error.raise_http_exception()
     return LinkRead.from_link(link)
+
+
+@router.get(
+    "/{slug}/qr",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "QR code for the frontend URL of the link.",
+            "content": {"image/png": {}},
+        },
+    },
+)
+async def get_link_qr_code_endpoint(
+    slug: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    """Get a QR code for the frontend URL of a link."""
+    try:
+        qr_code = await generate_link_qr_code(session, slug, user)
+    except SlugDoesNotExistError as slug_does_not_exist_error:
+        slug_does_not_exist_error.raise_http_exception()
+    except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
+        slug_not_owned_by_user_error.raise_http_exception()
+    return Response(
+        content=qr_code,
+        media_type="image/png",
+        headers={
+            # The QR code of a slug never changes, so clients can cache it.
+            "Cache-Control": "private, max-age=86400",
+            "Content-Disposition": f'inline; filename="{slug}.png"',
+        },
+    )
 
 
 @router.patch("/{slug}")

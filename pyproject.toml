@@ -22,6 +22,7 @@
     "psycopg[binary]==3.3.4",
     "pydantic-settings==2.14.1",
     "redis==8.0.0",
+    "segno==1.6.6",
     "sentry-sdk==2.61.1",
   ]
 
