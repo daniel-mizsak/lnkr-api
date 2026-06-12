@@ -4,7 +4,7 @@ API endpoints for health check.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
@@ -16,8 +16,6 @@ from lnkr.api.dependencies import get_cache, get_session
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
-
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,7 +37,7 @@ async def health_check_endpoint(
         )
 
     try:
-        cache_status = await cast("Awaitable[bool]", cache.ping())
+        cache_status = await cache.ping()
     except RedisError:
         cache_status = False
 

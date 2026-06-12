@@ -5,9 +5,11 @@ High level services for link management.
 """
 
 import contextlib
+import io
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
 
+import segno
 from anyio import to_thread
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -151,6 +153,19 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         # TODO: Make link cache invalidation reliable with a fail-closed invalidation marker.
         # If Redis cannot mark this slug stale, the mutation should not commit the delete.
         await link_cache.delete_cached_link_by_slug(cache, slug)
+
+
+async def generate_link_qr_code(session: AsyncSession, slug: str, user: User) -> bytes:
+    """Generate a QR code for the frontend URL of a link."""
+    link = await get_link_validate_user(session, slug, user)
+    short_url = f"{application_settings.FRONTEND_FORWARD_URL}/{link.slug}"
+    return await to_thread.run_sync(_generate_qr_code, short_url)
+
+
+def _generate_qr_code(content: str) -> bytes:
+    buffer = io.BytesIO()
+    segno.make(content, error="M").save(buffer, kind="png", scale=20)
+    return buffer.getvalue()
 
 
 async def list_links(
