@@ -36,7 +36,7 @@ def test_request_login_token__success(client: TestClient, mock_send_email: Async
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
         json={"email": email},
     )
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
     mock_send_email.assert_awaited_once()
 

@@ -119,7 +119,7 @@ async def update_link_endpoint(
     return LinkRead.from_link(link)
 
 
-@router.delete("/{slug}")
+@router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_link_endpoint(
     slug: str,
     session: Annotated[AsyncSession, Depends(get_session)],

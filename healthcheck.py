@@ -6,7 +6,7 @@ Health check script for the docker image.
 
 import sys
 
-import httpx
+import httpx2
 from fastapi import status
 
 
@@ -14,9 +14,9 @@ def main() -> int:
     """Perform api health check."""
     url = "http://127.0.0.1:8000/v1/health"
     try:
-        with httpx.Client(timeout=3) as client:
+        with httpx2.Client(timeout=3) as client:
             response = client.get(url)
-    except httpx.RequestError:
+    except httpx2.RequestError:
         return 1
 
     if response.status_code != status.HTTP_200_OK:

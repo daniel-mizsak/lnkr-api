@@ -41,7 +41,7 @@ email_templates = Jinja2Templates(directory="templates/email")
 router = APIRouter(prefix=application_settings.AUTH_PREFIX, dependencies=[Depends(verify_frontend_api_key)])
 
 
-@router.post("/request-login-token")
+@router.post("/request-login-token", status_code=status.HTTP_204_NO_CONTENT)
 async def request_login_token_endpoint(
     login_token_create: LoginTokenCreate,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -52,7 +52,7 @@ async def request_login_token_endpoint(
     message = _create_login_token_email(login_token_create.email, login_token_value)
     # TODO: Add try-except logic and stricter rate limiting.
     await send_email(message)
-    return Response(status_code=status.HTTP_200_OK)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/verify-login-token")
@@ -90,7 +90,7 @@ async def refresh_auth_tokens_endpoint(
     return AuthTokensRead(access_token=access_token, refresh_token=new_refresh_token)
 
 
-@router.post("/revoke-refresh-token")
+@router.post("/revoke-refresh-token", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_refresh_token_endpoint(
     refresh_token_revoke: RefreshTokenRevoke,
     session: Annotated[AsyncSession, Depends(get_session)],
