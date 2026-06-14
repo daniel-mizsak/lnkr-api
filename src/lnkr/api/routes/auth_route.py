@@ -13,7 +13,13 @@ from fastapi.templating import Jinja2Templates
 
 from lnkr.api.dependencies import get_session, verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import LoginTokenInvalidError, RefreshTokenInvalidError, UserDoesNotExistError
+from lnkr.exceptions import (
+    LoginTokenGenerationError,
+    LoginTokenInvalidError,
+    RefreshTokenGenerationError,
+    RefreshTokenInvalidError,
+    UserDoesNotExistError,
+)
 from lnkr.models import (
     AuthTokensRead,
     LoginTokenCreate,
@@ -47,7 +53,10 @@ async def request_login_token_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     """Request a login token that is sent to the user's email."""
-    login_token_value = await create_and_save_login_token(session, login_token_create)
+    try:
+        login_token_value = await create_and_save_login_token(session, login_token_create)
+    except LoginTokenGenerationError as login_token_generation_error:
+        login_token_generation_error.raise_http_exception()
 
     message = _create_login_token_email(login_token_create.email, login_token_value)
     # TODO: Add try-except logic and stricter rate limiting.
@@ -68,7 +77,12 @@ async def verify_login_token_endpoint(
 
     user = await get_or_create_user(session, UserCreate(email=login_token.email))
     access_token = create_access_token(user_id=user.id)
-    refresh_token = await create_and_save_refresh_token(session, user.id)
+    try:
+        # TODO: Make login-token consumption and refresh-token creation atomic so
+        # a retryable refresh-token failure does not consume the login token.
+        refresh_token = await create_and_save_refresh_token(session, user.id)
+    except RefreshTokenGenerationError as refresh_token_generation_error:
+        refresh_token_generation_error.raise_http_exception()
     return AuthTokensRead(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -83,6 +97,8 @@ async def refresh_auth_tokens_endpoint(
         user = await get_user_by_id(session, user_id)
     except RefreshTokenInvalidError as refresh_token_invalid_error:
         refresh_token_invalid_error.raise_http_exception()
+    except RefreshTokenGenerationError as refresh_token_generation_error:
+        refresh_token_generation_error.raise_http_exception()
     except UserDoesNotExistError as user_does_not_exist_error:
         user_does_not_exist_error.raise_http_exception()
 

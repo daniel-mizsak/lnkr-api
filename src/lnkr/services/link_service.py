@@ -25,6 +25,7 @@ from lnkr.exceptions import (
     LinkDisabledError,
     LinkExpiredError,
     LinkPasswordInvalidError,
+    RandomSlugGenerationError,
     SlugAlreadyExistsError,
     SlugDoesNotExistError,
     SlugNotOwnedByUserError,
@@ -81,8 +82,7 @@ async def generate_unused_random_slug(session: AsyncSession) -> str:
         if await link_database.get_link_by_slug(session, slug) is None:
             return slug
 
-    msg = "Failed to generate an unused random slug after multiple attempts."
-    raise RuntimeError(msg)
+    raise RandomSlugGenerationError
 
 
 def _generate_random_slug(random_slug_length: int) -> str:

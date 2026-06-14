@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from lnkr.api.dependencies import get_cache, get_current_user, get_session
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import (
+    RandomSlugGenerationError,
     SlugAlreadyExistsError,
     SlugDoesNotExistError,
     SlugNotOwnedByUserError,
@@ -60,8 +61,10 @@ async def get_random_slug_endpoint(
 ) -> SlugRead:
     """Get an unused random slug."""
     response.headers["Cache-Control"] = "no-store"
-    # TODO: Handle RuntimeError.
-    slug = await generate_unused_random_slug(session)
+    try:
+        slug = await generate_unused_random_slug(session)
+    except RandomSlugGenerationError as random_slug_generation_error:
+        random_slug_generation_error.raise_http_exception()
     return SlugRead(slug=slug)
 
 

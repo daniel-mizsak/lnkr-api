@@ -60,6 +60,27 @@ class LoginTokenInvalidError(LnkrError):
         )
 
 
+class LoginTokenGenerationError(LnkrError):
+    """Raised when a unique login token cannot be generated."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        msg = "Unable to generate a login token. Please try again."
+        super().__init__(msg)
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "login_token_generation_failed",
+                },
+            ],
+        )
+
+
 class RefreshTokenInvalidError(LnkrError):
     """Raised when a refresh token is invalid, used, revoked or expired."""
 
@@ -76,6 +97,27 @@ class RefreshTokenInvalidError(LnkrError):
                 {
                     "msg": str(self),
                     "type": "refresh_token_invalid",
+                },
+            ],
+        )
+
+
+class RefreshTokenGenerationError(LnkrError):
+    """Raised when a unique refresh token cannot be generated."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        msg = "Unable to generate a refresh token. Please try again."
+        super().__init__(msg)
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "refresh_token_generation_failed",
                 },
             ],
         )
@@ -222,6 +264,28 @@ class SlugNotOwnedByUserError(LnkrError):
                     "type": "slug_not_owned_by_user",
                 },
             ],
+        )
+
+
+class RandomSlugGenerationError(LnkrError):
+    """Raised when an unused random slug cannot be generated."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        msg = "Unable to generate an unused random slug. Please try again."
+        super().__init__(msg)
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "random_slug_generation_failed",
+                },
+            ],
+            headers=NO_STORE_HEADERS,
         )
 
 

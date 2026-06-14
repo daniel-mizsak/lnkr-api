@@ -129,8 +129,8 @@ def test_create_link__slug_already_exists(client: TestClient, slug: str, target_
 
 
 def test_create_link__user_does_not_exist(
-    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
     user: User,
     slug: str,
     target_url: str,
