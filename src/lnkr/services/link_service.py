@@ -6,6 +6,8 @@ High level services for link management.
 
 import contextlib
 import io
+import secrets
+import string
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Literal
 
@@ -23,6 +25,7 @@ from lnkr.exceptions import (
     LinkDisabledError,
     LinkExpiredError,
     LinkPasswordInvalidError,
+    RandomSlugGenerationError,
     SlugAlreadyExistsError,
     SlugDoesNotExistError,
     SlugNotOwnedByUserError,
@@ -66,6 +69,25 @@ async def create_link(session: AsyncSession, link_create: LinkCreate, user: User
         raise
 
     return link
+
+
+async def generate_unused_random_slug(session: AsyncSession) -> str:
+    """Generate a random slug that does not currently exist in the database."""
+    minimum_random_slug_length = 6
+    maximum_unused_random_slug_generation_attempts = 6
+
+    # TODO: Check if the slug contains English slur or other inappropriate content.
+    for attempt in range(maximum_unused_random_slug_generation_attempts):
+        slug = _generate_random_slug(minimum_random_slug_length + attempt)
+        if await link_database.get_link_by_slug(session, slug) is None:
+            return slug
+
+    raise RandomSlugGenerationError
+
+
+def _generate_random_slug(random_slug_length: int) -> str:
+    random_slug_alphabet = string.ascii_lowercase + string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(random_slug_alphabet) for _ in range(random_slug_length))
 
 
 async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> LinkCache:

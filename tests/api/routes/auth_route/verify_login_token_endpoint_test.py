@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import status
+from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
+from lnkr.database.tokens import refresh_token_database
 from lnkr.services.tokens.access_token_service import decode_access_token
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from lnkr.models import User
 
@@ -42,6 +45,29 @@ def test_verify_login_token_endpoint__login_token_invalid(client: TestClient) ->
     error = data["detail"][0]
     assert error["msg"] == "The provided login token is invalid, used or has expired"
     assert error["type"] == "login_token_invalid"
+
+
+def test_verify_login_token__refresh_token_generation_attempts_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    issued_login_token: str,
+) -> None:
+    # Raise IntegrityError to simulate a hash collision, which will exhaust the refresh token generation attempts.
+    async def _save_refresh_token(_session: AsyncSession, _refresh_token: object) -> object:
+        raise IntegrityError(statement=None, params=None, orig=Exception("token hash collision"))
+
+    monkeypatch.setattr(refresh_token_database, "save_refresh_token", _save_refresh_token)
+
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/verify-login-token",
+        json={"login_token_value": issued_login_token},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    error = data["detail"][0]
+    assert error["msg"] == "Unable to generate a refresh token. Please try again."
+    assert error["type"] == "refresh_token_generation_failed"
 
 
 def test_verify_login_token__success(client: TestClient, issued_login_token: str, user: User) -> None:

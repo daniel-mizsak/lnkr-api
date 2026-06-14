@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import status
+from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
+from lnkr.database.tokens import refresh_token_database
 from lnkr.services.tokens.access_token_service import decode_access_token
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from lnkr.models import User
 
@@ -42,6 +45,37 @@ def test_refresh_auth_tokens__refresh_token_invalid(client: TestClient) -> None:
     error = data["detail"][0]
     assert error["msg"] == "The provided refresh token is invalid, used, revoked or has expired"
     assert error["type"] == "refresh_token_invalid"
+
+
+def test_refresh_auth_tokens__refresh_token_generation_attempts_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    issued_auth_tokens: dict[str, str],
+) -> None:
+    # Raise IntegrityError to simulate a hash collision, which will exhaust the refresh token generation attempts.
+    async def _save_refresh_token(_session: AsyncSession, _refresh_token: object) -> object:
+        raise IntegrityError(statement=None, params=None, orig=Exception("token hash collision"))
+
+    with monkeypatch.context() as patch_context:
+        patch_context.setattr(refresh_token_database, "save_refresh_token", _save_refresh_token)
+
+        response = client.post(
+            url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/refresh-auth-tokens",
+            json={"refresh_token_value": issued_auth_tokens["refresh_token"]},
+        )
+        data = response.json()
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        error = data["detail"][0]
+        assert error["msg"] == "Unable to generate a refresh token. Please try again."
+        assert error["type"] == "refresh_token_generation_failed"
+
+    # The failed rotation must roll back consuming the original token, so retrying it should still work.
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/refresh-auth-tokens",
+        json={"refresh_token_value": issued_auth_tokens["refresh_token"]},
+    )
+    assert response.status_code == status.HTTP_200_OK
 
 
 def test_refresh_auth_tokens__success(client: TestClient, issued_auth_tokens: dict[str, str], user: User) -> None:

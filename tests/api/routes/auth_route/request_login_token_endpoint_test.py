@@ -9,13 +9,16 @@ from typing import TYPE_CHECKING
 import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
+from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
+from lnkr.database.tokens import login_token_database
 
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock
 
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.usefixtures("override_verify_frontend_api_key")
@@ -29,6 +32,31 @@ def test_request_login_token__missing_frontend_api_key(client: TestClient) -> No
     error = data["detail"][0]
     assert error["msg"] == "The provided frontend api key is invalid"
     assert error["type"] == "frontend_api_key_invalid"
+
+
+def test_request_login_token__login_token_generation_attempts_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    mock_send_email: AsyncMock,
+    email: str,
+) -> None:
+    # Raise IntegrityError to simulate a hash collision, which will exhaust the login token generation attempts.
+    async def _save_login_token(_session: AsyncSession, _login_token: object) -> object:
+        raise IntegrityError(statement=None, params=None, orig=Exception("token hash collision"))
+
+    monkeypatch.setattr(login_token_database, "save_login_token", _save_login_token)
+
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    mock_send_email.assert_not_awaited()
+    error = data["detail"][0]
+    assert error["msg"] == "Unable to generate a login token. Please try again."
+    assert error["type"] == "login_token_generation_failed"
 
 
 def test_request_login_token__success(client: TestClient, mock_send_email: AsyncMock, email: str) -> None:

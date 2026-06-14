@@ -51,11 +51,11 @@ def _get_ip_address(
 @router.get("/{slug}")
 async def forward_to_target_url_endpoint(
     slug: str,
-    response: Response,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
     ip_address: Annotated[str | None, Depends(_get_ip_address)],
+    response: Response,
 ) -> LinkForward:
     """Return the target url of the link with the given slug."""
     response.headers["Cache-Control"] = "no-store"
@@ -81,11 +81,11 @@ async def forward_to_target_url_endpoint(
 async def unlock_target_url_endpoint(
     slug: str,
     link_unlock: LinkUnlock,
-    response: Response,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
     ip_address: Annotated[str | None, Depends(_get_ip_address)],
+    response: Response,
 ) -> LinkForward:
     """Return the target url of the link with the given slug if the provided password is correct."""
     response.headers["Cache-Control"] = "no-store"

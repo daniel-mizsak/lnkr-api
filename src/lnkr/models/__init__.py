@@ -14,6 +14,7 @@ from lnkr.models.link_model import (
     LinkStatus,
     LinkUnlock,
     LinkUpdate,
+    SlugRead,
 )
 from lnkr.models.tokens import AuthTokensRead
 from lnkr.models.tokens.access_token_model import AccessTokenPayload
@@ -41,6 +42,7 @@ __all__ = [
     "RefreshToken",
     "RefreshTokenRevoke",
     "RefreshTokenRotate",
+    "SlugRead",
     "User",
     "UserCreate",
     "UserRead",

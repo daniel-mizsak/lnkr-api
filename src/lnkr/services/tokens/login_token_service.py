@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from lnkr.config.application_settings import application_settings
 from lnkr.database.tokens import login_token_database
-from lnkr.exceptions import LoginTokenInvalidError
+from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError
 from lnkr.models import LoginToken, LoginTokenCreate
 
 if TYPE_CHECKING:
@@ -25,9 +25,8 @@ async def create_and_save_login_token(session: AsyncSession, login_token_create:
     """Create a login token and save it to the database."""
     try:
         login_token_value = await _create_login_token_without_commit(session, login_token_create)
-        # TODO: Handle RuntimeError.
         await session.commit()
-    except SQLAlchemyError:
+    except LoginTokenGenerationError, SQLAlchemyError:
         await session.rollback()
         raise
 
@@ -52,10 +51,7 @@ async def consume_login_token(session: AsyncSession, login_token_value: str) -> 
     return login_token
 
 
-async def _create_login_token_without_commit(
-    session: AsyncSession,
-    login_token_create: LoginTokenCreate,
-) -> str:
+async def _create_login_token_without_commit(session: AsyncSession, login_token_create: LoginTokenCreate) -> str:
     maximum_unique_login_token_generation_attempts = 5
 
     # TODO: Check if the login token contains English slur or other inappropriate content.
@@ -75,8 +71,7 @@ async def _create_login_token_without_commit(
         else:
             return login_token_value
 
-    msg = "Failed to generate a unique login token after multiple attempts."
-    raise RuntimeError(msg)
+    raise LoginTokenGenerationError
 
 
 def _hash_token(token_value: str) -> str:

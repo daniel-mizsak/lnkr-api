@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from lnkr.config.application_settings import application_settings
 from lnkr.database.tokens import refresh_token_database
-from lnkr.exceptions import RefreshTokenInvalidError
+from lnkr.exceptions import RefreshTokenGenerationError, RefreshTokenInvalidError
 from lnkr.models import RefreshToken
 
 if TYPE_CHECKING:
@@ -26,9 +26,8 @@ async def create_and_save_refresh_token(session: AsyncSession, user_id: uuid.UUI
     """Create a refresh token and save it to the database."""
     try:
         refresh_token_value = await _create_refresh_token_without_commit(session, user_id)
-        # TODO: Handle RuntimeError.
         await session.commit()
-    except SQLAlchemyError:
+    except RefreshTokenGenerationError, SQLAlchemyError:
         await session.rollback()
         raise
 
@@ -46,9 +45,8 @@ async def rotate_refresh_token(session: AsyncSession, refresh_token_value: str) 
             raise RefreshTokenInvalidError
 
         new_refresh_token_value = await _create_refresh_token_without_commit(session, refresh_token.user_id)
-        # TODO: Handle RuntimeError.
         await session.commit()
-    except SQLAlchemyError:
+    except RefreshTokenGenerationError, SQLAlchemyError:
         await session.rollback()
         raise
 
@@ -90,8 +88,7 @@ async def _create_refresh_token_without_commit(session: AsyncSession, user_id: u
         else:
             return refresh_token_value
 
-    msg = "Failed to generate a unique refresh token after multiple attempts."
-    raise RuntimeError(msg)
+    raise RefreshTokenGenerationError
 
 
 def _hash_token(token_value: str) -> str:
