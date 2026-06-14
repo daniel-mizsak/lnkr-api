@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 async def create_and_save_login_token(session: AsyncSession, login_token_create: LoginTokenCreate) -> str:
     """Create a login token and save it to the database."""
     try:
-        login_token_value = await _create_login_token_without_commit(session, login_token_create)
         # TODO: Handle RuntimeError.
+        login_token_value = await _create_login_token_without_commit(session, login_token_create)
         await session.commit()
     except SQLAlchemyError:
         await session.rollback()
@@ -52,10 +52,7 @@ async def consume_login_token(session: AsyncSession, login_token_value: str) -> 
     return login_token
 
 
-async def _create_login_token_without_commit(
-    session: AsyncSession,
-    login_token_create: LoginTokenCreate,
-) -> str:
+async def _create_login_token_without_commit(session: AsyncSession, login_token_create: LoginTokenCreate) -> str:
     maximum_unique_login_token_generation_attempts = 5
 
     # TODO: Check if the login token contains English slur or other inappropriate content.

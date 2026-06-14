@@ -17,11 +17,12 @@ from lnkr.exceptions import (
     UserDoesNotExistError,
     UserLinkLimitExceededError,
 )
-from lnkr.models import LinkCreate, LinkRead, LinkUpdate, User
+from lnkr.models import LinkCreate, LinkRead, LinkUpdate, SlugRead, User
 from lnkr.services.link_service import (
     create_link,
     delete_link,
     generate_link_qr_code,
+    generate_unused_random_slug,
     get_link_validate_user,
     list_links,
     update_link,
@@ -50,6 +51,18 @@ async def create_link_endpoint(
     except UserLinkLimitExceededError as user_link_limit_exceeded_error:
         user_link_limit_exceeded_error.raise_http_exception()
     return LinkRead.from_link(link)
+
+
+@router.get("/slugs/random", dependencies=[Depends(get_current_user)])
+async def get_random_slug_endpoint(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
+) -> SlugRead:
+    """Get an unused random slug."""
+    response.headers["Cache-Control"] = "no-store"
+    # TODO: Handle RuntimeError.
+    slug = await generate_unused_random_slug(session)
+    return SlugRead(slug=slug)
 
 
 @router.get("/{slug}")

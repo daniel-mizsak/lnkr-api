@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 async def create_and_save_refresh_token(session: AsyncSession, user_id: uuid.UUID) -> str:
     """Create a refresh token and save it to the database."""
     try:
-        refresh_token_value = await _create_refresh_token_without_commit(session, user_id)
         # TODO: Handle RuntimeError.
+        refresh_token_value = await _create_refresh_token_without_commit(session, user_id)
         await session.commit()
     except SQLAlchemyError:
         await session.rollback()
@@ -45,8 +45,8 @@ async def rotate_refresh_token(session: AsyncSession, refresh_token_value: str) 
             await session.rollback()
             raise RefreshTokenInvalidError
 
-        new_refresh_token_value = await _create_refresh_token_without_commit(session, refresh_token.user_id)
         # TODO: Handle RuntimeError.
+        new_refresh_token_value = await _create_refresh_token_without_commit(session, refresh_token.user_id)
         await session.commit()
     except SQLAlchemyError:
         await session.rollback()

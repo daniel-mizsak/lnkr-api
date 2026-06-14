@@ -129,7 +129,11 @@ def test_create_link__slug_already_exists(client: TestClient, slug: str, target_
 
 
 def test_create_link__user_does_not_exist(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, user: User, slug: str, target_url: str
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    user: User,
+    slug: str,
+    target_url: str,
 ) -> None:
     async def _create_link(_session: AsyncSession, _link_create: LinkCreate, user: User) -> Link:
         raise UserDoesNotExistError.by_id(user_id=user.id)

@@ -24,6 +24,12 @@ MAX_TARGET_URL_LENGTH = 1024
 LinkPassword = Annotated[str, Field(min_length=1, max_length=32)]
 
 
+class SlugRead(BaseModel):
+    """Slug schema for reading a slug."""
+
+    slug: str
+
+
 class LinkStatus(StrEnum):
     """Link status enumeration."""
 
