@@ -19,6 +19,9 @@ ANSIBLE_ANSIBLE_LINT_PRE_COMMANDS:
   - command: ansible-galaxy collection install --requirements-file ./deployment/ansible/requirements.yml
     cwd: "workspace"
     run_before_linters: true
+ANSIBLE_ANSIBLE_LINT_ARGUMENTS:
+  - --exclude
+  - github_conf
 BASH_SHFMT_ARGUMENTS: --indent=4 --space-redirects
 MARKDOWN_MARKDOWNLINT_FILTER_REGEX_EXCLUDE: (^\.github/PULL_REQUEST_TEMPLATE\.md$)
 REPOSITORY_CHECKOV_CONFIG_FILE: .github/linters/.checkov.yml
