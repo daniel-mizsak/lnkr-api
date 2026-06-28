@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.templating import Jinja2Templates
 
-from lnkr.api.dependencies import get_session, verify_frontend_api_key
+from lnkr.api.dependencies import get_geoip_reader, get_ip_address, get_session, get_user_agent, verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import (
     LoginTokenGenerationError,
@@ -29,6 +29,7 @@ from lnkr.models import (
     UserCreate,
 )
 from lnkr.services.email_service import send_email
+from lnkr.services.geoip_service import get_country_code_from_ip
 from lnkr.services.tokens.access_token_service import create_access_token
 from lnkr.services.tokens.login_token_service import consume_login_token, create_and_save_login_token
 from lnkr.services.tokens.refresh_token_service import (
@@ -39,7 +40,10 @@ from lnkr.services.tokens.refresh_token_service import (
 from lnkr.services.user_service import get_or_create_user, get_user_by_id
 
 if TYPE_CHECKING:
+    from geoip2.database import Reader
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from lnkr.models import IpAddress, UserAgent
 
 email_templates = Jinja2Templates(directory="templates/email")
 
@@ -51,14 +55,30 @@ router = APIRouter(prefix=application_settings.AUTH_PREFIX, dependencies=[Depend
 async def request_login_token_endpoint(
     login_token_create: LoginTokenCreate,
     session: Annotated[AsyncSession, Depends(get_session)],
+    geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
+    ip_address: Annotated[IpAddress, Depends(get_ip_address)],
+    user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> Response:
     """Request a login token that is sent to the user's email."""
+    country_code = get_country_code_from_ip(geoip_reader, ip_address.ip_address)
     try:
-        login_token_value = await create_and_save_login_token(session, login_token_create)
+        login_token_value = await create_and_save_login_token(
+            session,
+            login_token_create,
+            ip_address,
+            country_code,
+            user_agent,
+        )
     except LoginTokenGenerationError as login_token_generation_error:
         login_token_generation_error.raise_http_exception()
 
-    message = _create_login_token_email(login_token_create.email, login_token_value)
+    message = _create_login_token_email(
+        login_token_create.email,
+        login_token_value,
+        ip_address,
+        country_code,
+        user_agent,
+    )
     # TODO: Add try-except logic and stricter rate limiting.
     await send_email(message)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -120,7 +140,13 @@ async def revoke_refresh_token_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-def _create_login_token_email(to_address: str, token: str) -> MIMEMultipart:
+def _create_login_token_email(
+    to_address: str,
+    token: str,
+    ip_address: IpAddress,
+    country_code: str | None,
+    user_agent: UserAgent,
+) -> MIMEMultipart:
     message = MIMEMultipart()
     message["From"] = application_settings.FROM_EMAIL
     message["To"] = to_address
@@ -129,6 +155,9 @@ def _create_login_token_email(to_address: str, token: str) -> MIMEMultipart:
     message_body = email_templates.get_template("login_token.html.j2").render(
         expiry_time=application_settings.LOGIN_TOKEN_EXPIRE_MINUTES,
         token=token,
+        ip_address=ip_address.ip_address,
+        country_code=country_code,
+        user_agent=user_agent,
         # TODO: Add callback URL to request login token endpoint and attach to login_url.
         # TODO: Use urllib.parse.quote to encode the token value in the URL.
         login_url=f"{application_settings.FRONTEND_APP_URL}/login/verify?login_token_value={token}",

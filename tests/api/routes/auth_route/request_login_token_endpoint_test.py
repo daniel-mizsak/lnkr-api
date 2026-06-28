@@ -9,10 +9,13 @@ from typing import TYPE_CHECKING
 import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from lnkr.api.dependencies.header import CLIENT_IP_HEADER, USER_AGENT_HEADER
 from lnkr.config.application_settings import application_settings
 from lnkr.database.tokens import login_token_database
+from lnkr.models import LoginToken
 
 if TYPE_CHECKING:
     from unittest.mock import AsyncMock
@@ -59,10 +62,43 @@ def test_request_login_token__login_token_generation_attempts_exhausted(
     assert error["type"] == "login_token_generation_failed"
 
 
-def test_request_login_token__success(client: TestClient, mock_send_email: AsyncMock, email: str) -> None:
+def test_request_login_token__missing_metadata(
+    client: TestClient,
+    mock_send_email: AsyncMock,
+    email: str,
+    user_agent_unrecognized: str,
+) -> None:
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
         json={"email": email},
+        headers={USER_AGENT_HEADER: user_agent_unrecognized},
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    await_args = mock_send_email.await_args
+    assert await_args is not None
+    sent_email = await_args.args[0]
+    email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
+    soup = BeautifulSoup(email_body, "html.parser")
+
+    assert _get_text_by_class(soup, "request-ip-address") == "Unavailable"
+    assert _get_text_by_class(soup, "request-country-code") == "Unavailable"
+    assert _get_text_by_class(soup, "request-user-agent") == "Unavailable"
+
+
+async def test_request_login_token__success(
+    client: TestClient,
+    session: AsyncSession,
+    mock_send_email: AsyncMock,
+    email: str,
+    ip_address_public: str,
+    ip_address_public_country_code: str,
+    user_agent: str,
+) -> None:
+    response = client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+        headers={CLIENT_IP_HEADER: ip_address_public, USER_AGENT_HEADER: user_agent},
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -78,7 +114,21 @@ def test_request_login_token__success(client: TestClient, mock_send_email: Async
 
     email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
     soup = BeautifulSoup(email_body, "html.parser")
-    login_token_span = soup.find("span", class_="login-token")
-    assert login_token_span is not None
-    login_token_value = login_token_span.get_text().strip()
+    login_token_value = _get_text_by_class(soup, "login-token")
     assert len(login_token_value) == 6
+    assert _get_text_by_class(soup, "request-ip-address") == ip_address_public
+    assert _get_text_by_class(soup, "request-country-code") == ip_address_public_country_code
+    assert _get_text_by_class(soup, "request-user-agent") == "Chrome on Mac OS X"
+
+    result = await session.execute(select(LoginToken))
+    login_token = result.scalar_one()
+    assert login_token.ip_address == ip_address_public
+    assert login_token.country_code == ip_address_public_country_code
+    assert login_token.browser == "Chrome"
+    assert login_token.operating_system == "Mac OS X"
+
+
+def _get_text_by_class(soup: BeautifulSoup, class_name: str) -> str:
+    element = soup.find(class_=class_name)
+    assert element is not None
+    return element.get_text(strip=True)

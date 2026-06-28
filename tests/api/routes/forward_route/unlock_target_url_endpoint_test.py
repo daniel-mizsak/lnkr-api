@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import status
 
+from lnkr.api.dependencies.header import FRONTEND_API_KEY_HEADER
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
@@ -95,7 +96,13 @@ def test_unlock_target_url__wrong_password(client: TestClient, slug: str, target
     assert response.json() == []
 
 
-def test_unlock_target_url__success(client: TestClient, slug: str, target_url: str, password: str) -> None:
+def test_unlock_target_url__success(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    password: str,
+    frontend_api_key: str,
+) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
@@ -104,6 +111,7 @@ def test_unlock_target_url__success(client: TestClient, slug: str, target_url: s
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
     )
     data = response.json()
 

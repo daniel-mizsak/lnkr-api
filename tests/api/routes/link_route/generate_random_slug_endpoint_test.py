@@ -32,8 +32,8 @@ def test_generate_random_slug__success(client: TestClient) -> None:
 
 
 def test_generate_random_slug__skips_existing_slug(
-    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
     target_url: str,
 ) -> None:
     existing_slug = "existing-slug"

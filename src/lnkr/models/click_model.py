@@ -6,22 +6,37 @@ Data schemas and database models for click management.
 
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lnkr.models.base import Base
+from lnkr.models.constraints import COUNTRY_CODE_LENGTH, IP_ADDRESS_MAX_LENGTH, USER_AGENT_METADATA_MAX_LENGTH
 
 if TYPE_CHECKING:
     from lnkr.models import Link
 
 
+class ClickSource(StrEnum):
+    """Click source enumeration."""
+
+    # Official lnkr application, identified by a valid frontend API key.
+    LNKR_APP = "lnkr_app"
+
+    # Public API request without an authenticated API client.
+    PUBLIC_API = "public_api"
+
+
 class ClickCreate(BaseModel):
     """Click schema for creating a click."""
 
+    source: ClickSource
     ip_address: str | None
+    browser: str | None
+    operating_system: str | None
 
 
 class ClickRead(BaseModel):
@@ -30,11 +45,19 @@ class ClickRead(BaseModel):
     timestamp: datetime
     ip_address: str | None
     country_code: str | None
+    browser: str | None
+    operating_system: str | None
 
     @classmethod
     def from_click(cls, click: Click) -> ClickRead:
         """Create a ClickRead instance from a Click instance."""
-        return cls(timestamp=click.timestamp, ip_address=click.ip_address, country_code=click.country_code)
+        return cls(
+            timestamp=click.timestamp,
+            ip_address=click.ip_address,
+            country_code=click.country_code,
+            browser=click.browser,
+            operating_system=click.operating_system,
+        )
 
 
 class Click(Base):
@@ -48,9 +71,12 @@ class Click(Base):
         default=lambda: datetime.now(tz=UTC),
         nullable=False,
     )
-    # 45 is the length of IPv4-mapped IPv6 addresses.
-    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
-    country_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # TODO: Make sure source is added to existing records.
+    source: Mapped[ClickSource] = mapped_column(Enum(ClickSource, name="click_source"), nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(IP_ADDRESS_MAX_LENGTH), nullable=True)
+    country_code: Mapped[str | None] = mapped_column(String(COUNTRY_CODE_LENGTH), nullable=True)
+    browser: Mapped[str | None] = mapped_column(String(USER_AGENT_METADATA_MAX_LENGTH), nullable=True)
+    operating_system: Mapped[str | None] = mapped_column(String(USER_AGENT_METADATA_MAX_LENGTH), nullable=True)
 
     link_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -63,4 +89,11 @@ class Click(Base):
     @classmethod
     def from_click_create(cls, click_create: ClickCreate, country_code: str | None, link_id: uuid.UUID) -> Click:
         """Create a Click instance from a ClickCreate instance."""
-        return cls(ip_address=click_create.ip_address, country_code=country_code, link_id=link_id)
+        return cls(
+            source=click_create.source,
+            ip_address=click_create.ip_address,
+            country_code=country_code,
+            browser=click_create.browser,
+            operating_system=click_create.operating_system,
+            link_id=link_id,
+        )

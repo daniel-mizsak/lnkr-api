@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from geoip2.errors import AddressNotFoundError
 
+from lnkr.config.application_settings import application_settings
 from lnkr.models import User
 
 if TYPE_CHECKING:
@@ -63,6 +64,16 @@ def expires_at_past_fixture() -> datetime:
     return datetime.now(UTC) - timedelta(days=1)
 
 
+@pytest.fixture(name="frontend_api_key")
+def frontend_api_key_fixture() -> str:
+    return application_settings.FRONTEND_API_KEY.get_secret_value()
+
+
+@pytest.fixture(name="frontend_api_key_invalid")
+def frontend_api_key_invalid_fixture() -> str:
+    return "frontend-api-key-invalid"
+
+
 @pytest.fixture(name="ip_address_public")
 def ip_address_public_fixture() -> str:
     return "8.8.8.8"
@@ -81,6 +92,19 @@ def ip_address_malformed_fixture() -> str:
 @pytest.fixture(name="ip_address_public_country_code")
 def ip_address_public_country_code_fixture() -> str:
     return "US"
+
+
+@pytest.fixture(name="user_agent")
+def user_agent_fixture() -> str:
+    return (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+    )
+
+
+@pytest.fixture(name="user_agent_unrecognized")
+def user_agent_unrecognized_fixture() -> str:
+    return "test-client"
 
 
 @pytest.fixture(name="geoip_reader")

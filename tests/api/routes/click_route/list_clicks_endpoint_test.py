@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import status
 
+from lnkr.api.dependencies.header import CLIENT_IP_HEADER, FRONTEND_API_KEY_HEADER, USER_AGENT_HEADER
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
@@ -73,12 +74,30 @@ def test_list_clicks__empty(client: TestClient, slug: str, target_url: str) -> N
     assert data == []
 
 
+def test_list_clicks__public_api_clicks_excluded(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
+
+
 def test_list_clicks__success(
     client: TestClient,
     slug: str,
     target_url: str,
+    frontend_api_key: str,
     ip_address_public: str,
     ip_address_public_country_code: str,
+    user_agent: str,
 ) -> None:
     timestamp = datetime.now(tz=UTC)
     client.post(
@@ -86,17 +105,16 @@ def test_list_clicks__success(
         json={"slug": slug, "target_url": target_url},
     )
 
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
     )
-    data = response.json()
-    assert len(data) == 0
-
-    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
         headers={
-            "X-Client-IP": ip_address_public,
+            FRONTEND_API_KEY_HEADER: frontend_api_key,
+            CLIENT_IP_HEADER: ip_address_public,
+            USER_AGENT_HEADER: user_agent,
         },
     )
 
@@ -112,6 +130,14 @@ def test_list_clicks__success(
     for item in data:
         item_timestamp = datetime.fromisoformat(item["timestamp"])
         assert timestamp < item_timestamp < timestamp + timedelta(seconds=1)
-        assert set(item.keys()) == {"timestamp", "ip_address", "country_code"}
+        assert set(item.keys()) == {
+            "timestamp",
+            "ip_address",
+            "country_code",
+            "browser",
+            "operating_system",
+        }
     assert {item["ip_address"] for item in data} == {None, ip_address_public}
     assert {item["country_code"] for item in data} == {None, ip_address_public_country_code}
+    assert {item["browser"] for item in data} == {None, "Chrome"}
+    assert {item["operating_system"] for item in data} == {None, "Mac OS X"}

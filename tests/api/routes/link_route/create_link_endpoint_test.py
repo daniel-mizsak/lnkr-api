@@ -12,7 +12,7 @@ from fastapi import status
 
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import UserDoesNotExistError
-from lnkr.models.link_model import MAX_TARGET_URL_LENGTH
+from lnkr.models.link_model import TARGET_URL_MAX_LENGTH
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -91,7 +91,7 @@ def test_create_link__invalid_target_url(
     assert error["type"] == "url_parsing"
 
     # max_length
-    target_url_too_long = target_url + "a" * MAX_TARGET_URL_LENGTH
+    target_url_too_long = target_url + "a" * TARGET_URL_MAX_LENGTH
     response = client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url_too_long},
@@ -103,7 +103,7 @@ def test_create_link__invalid_target_url(
     assert error["input"] == target_url_too_long
     assert error["loc"] == ["body", "target_url"]
     assert error["msg"] == (
-        f"Value should have at most {MAX_TARGET_URL_LENGTH} items after validation, not {len(target_url_too_long)}"
+        f"Value should have at most {TARGET_URL_MAX_LENGTH} items after validation, not {len(target_url_too_long)}"
     )
     assert error["type"] == "too_long"
 

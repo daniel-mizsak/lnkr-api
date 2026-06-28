@@ -1,6 +1,6 @@
 # Build System
 [build-system]
-  requires = ["uv_build>=0.11.3,<0.12"]
+  requires = ["uv_build>=0.11,<0.12"]
   build-backend = "uv_build"
 
 # Project Metadata
@@ -12,18 +12,19 @@
   requires-python = ">=3.14"
   dependencies = [
     "PyJWT==2.13.0",
-    "SQLAlchemy[asyncio]==2.0.50",
+    "SQLAlchemy[asyncio]==2.0.51",
     "alembic[tz]==1.18.4",
-    "anyio==4.13.0",
+    "anyio==4.14.0",
     "argon2-cffi==25.1.0",
-    "fastapi[standard]==0.136.3",
+    "fastapi[standard]==0.138.0",
     "geoip2==5.2.0",
-    "httpx2==2.3.0",
+    "httpx2==2.4.0",
     "psycopg[binary]==3.3.4",
-    "pydantic-settings==2.14.1",
+    "pydantic-settings==2.14.2",
     "redis==8.0.0",
     "segno==1.6.6",
-    "sentry-sdk==2.61.1",
+    "sentry-sdk==2.63.0",
+    "ua-parser[regex]==1.0.2",
   ]
 
   [project.urls]
@@ -34,17 +35,17 @@
   dev = [
     { include-group = "lint" },
     "ansible-lint==26.4.0",
-    "beautifulsoup4==4.14.3",
-    "coverage==7.14.1",
-    "fakeredis==2.36.0",
-    "prek==0.4.3",
+    "beautifulsoup4==4.15.0",
+    "coverage==7.14.2",
+    "fakeredis==2.36.2",
+    "prek==0.4.5",
     "pytest-asyncio==1.4.0",
-    "pytest==9.0.3",
+    "pytest==9.1.1",
     "testcontainers[postgres]==4.14.2",
-    "ty==0.0.42",
+    "ty==0.0.51",
   ]
-  lint = ["ruff==0.15.15"]
-  deployment = ["ansible==14.0.0"]
+  lint = ["ruff==0.15.18"]
+  deployment = ["ansible==14.1.0"]
 
 # Tools
 # Pytest

@@ -4,7 +4,8 @@ Data schemas and database models.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from lnkr.models.click_model import Click, ClickCreate, ClickRead
+from lnkr.models.click_model import Click, ClickCreate, ClickRead, ClickSource
+from lnkr.models.header_model import IpAddress, UserAgent
 from lnkr.models.link_model import (
     Link,
     LinkCache,
@@ -28,6 +29,8 @@ __all__ = [
     "Click",
     "ClickCreate",
     "ClickRead",
+    "ClickSource",
+    "IpAddress",
     "Link",
     "LinkCache",
     "LinkCreate",
@@ -44,6 +47,7 @@ __all__ = [
     "RefreshTokenRotate",
     "SlugRead",
     "User",
+    "UserAgent",
     "UserCreate",
     "UserRead",
     "UserStatus",
