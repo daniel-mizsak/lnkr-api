@@ -33,7 +33,7 @@ repos:
 
   # zizmor
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: 9257c6050c0261b8c57e712f632dc4a8010109a9 # frozen: v1.25.2
+    rev: e3eebf65325ccc992422292cb7a4baee967cf815 # frozen: v1.26.1
     hooks:
       - id: zizmor
 
@@ -56,9 +56,28 @@ repos:
     hooks:
       - id: codespell
 
-  # ruff
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 22f0422809455ec89ffdcf5a00170ba816e42ddb # frozen: v0.15.16
+  - repo: local
     hooks:
+      # ruff
       - id: ruff-check
+        name: ruff check
+        entry: uv run --locked --only-group lint ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+
       - id: ruff-format
+        name: ruff format
+        entry: uv run --locked --only-group lint ruff format
+        language: system
+        types: [python]
+        require_serial: true
+
+      # ty
+      - id: ty
+        name: ty check
+        entry: uv run --locked ty check
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true

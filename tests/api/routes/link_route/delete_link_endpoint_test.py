@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import status
 
+from lnkr.api.dependencies.header import FRONTEND_API_KEY_HEADER
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
@@ -74,13 +75,24 @@ def test_delete_link__success(client: TestClient, slug: str, target_url: str) ->
     assert error["type"] == "slug_does_not_exist"
 
 
-def test_delete_link__reset_click_count(client: TestClient, slug: str, target_url: str) -> None:
+def test_delete_link__reset_click_count(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    frontend_api_key: str,
+) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
-    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
-    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
+    )
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
+    )
 
     response = client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"

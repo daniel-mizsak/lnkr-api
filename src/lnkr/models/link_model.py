@@ -19,7 +19,9 @@ if TYPE_CHECKING:
     from lnkr.models import Click, User
 
 
-MAX_TARGET_URL_LENGTH = 1024
+SLUG_MIN_LENGTH = 4
+SLUG_MAX_LENGTH = 16
+TARGET_URL_MAX_LENGTH = 1024
 
 LinkPassword = Annotated[str, Field(min_length=1, max_length=32)]
 
@@ -43,12 +45,12 @@ class LinkCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slug: str = Field(
-        min_length=4,
-        max_length=16,
+        min_length=SLUG_MIN_LENGTH,
+        max_length=SLUG_MAX_LENGTH,
         pattern=r"^[a-zA-Z0-9-]+$",
         json_schema_extra={"examples": ["slug"]},
     )
-    target_url: HttpUrl = Field(max_length=MAX_TARGET_URL_LENGTH)
+    target_url: HttpUrl = Field(max_length=TARGET_URL_MAX_LENGTH)
     expires_at: AwareDatetime | None = Field(default=None, json_schema_extra={"examples": [None]})
     password: LinkPassword | None = Field(default=None, json_schema_extra={"examples": [None]})
 
@@ -83,7 +85,7 @@ class LinkUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    target_url: HttpUrl | None = Field(default=None, max_length=MAX_TARGET_URL_LENGTH)
+    target_url: HttpUrl | None = Field(default=None, max_length=TARGET_URL_MAX_LENGTH)
     expires_at: AwareDatetime | None = None
     status: LinkStatus | None = None
     password: LinkPassword | None = None
@@ -143,8 +145,8 @@ class Link(Base):
     __tablename__ = "links"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    slug: Mapped[str] = mapped_column(String(16), index=True, unique=True, nullable=False)
-    target_url: Mapped[str] = mapped_column(String(MAX_TARGET_URL_LENGTH), nullable=False)
+    slug: Mapped[str] = mapped_column(String(SLUG_MAX_LENGTH), index=True, unique=True, nullable=False)
+    target_url: Mapped[str] = mapped_column(String(TARGET_URL_MAX_LENGTH), nullable=False)
     status: Mapped[LinkStatus] = mapped_column(
         Enum(LinkStatus, name="link_status"),
         default=LinkStatus.ACTIVE,

@@ -15,16 +15,30 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from lnkr.config.application_settings import application_settings
 from lnkr.database.tokens import login_token_database
 from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError
-from lnkr.models import LoginToken, LoginTokenCreate
+from lnkr.models import LoginToken
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from lnkr.models import IpAddress, LoginTokenCreate, UserAgent
 
-async def create_and_save_login_token(session: AsyncSession, login_token_create: LoginTokenCreate) -> str:
+
+async def create_and_save_login_token(
+    session: AsyncSession,
+    login_token_create: LoginTokenCreate,
+    ip_address: IpAddress,
+    country_code: str | None,
+    user_agent: UserAgent,
+) -> str:
     """Create a login token and save it to the database."""
     try:
-        login_token_value = await _create_login_token_without_commit(session, login_token_create)
+        login_token_value = await _create_login_token_without_commit(
+            session,
+            login_token_create,
+            ip_address,
+            country_code,
+            user_agent,
+        )
         await session.commit()
     except LoginTokenGenerationError, SQLAlchemyError:
         await session.rollback()
@@ -51,7 +65,13 @@ async def consume_login_token(session: AsyncSession, login_token_value: str) -> 
     return login_token
 
 
-async def _create_login_token_without_commit(session: AsyncSession, login_token_create: LoginTokenCreate) -> str:
+async def _create_login_token_without_commit(
+    session: AsyncSession,
+    login_token_create: LoginTokenCreate,
+    ip_address: IpAddress,
+    country_code: str | None,
+    user_agent: UserAgent,
+) -> str:
     maximum_unique_login_token_generation_attempts = 5
 
     # TODO: Check if the login token contains English slur or other inappropriate content.
@@ -64,7 +84,14 @@ async def _create_login_token_without_commit(session: AsyncSession, login_token_
                 expires_at = datetime.now(tz=UTC) + timedelta(minutes=application_settings.LOGIN_TOKEN_EXPIRE_MINUTES)
                 await login_token_database.save_login_token(
                     session,
-                    LoginToken.from_login_token_create(login_token_create, token_hash, expires_at),
+                    LoginToken.from_login_token_create(
+                        login_token_create,
+                        token_hash,
+                        expires_at,
+                        ip_address,
+                        country_code,
+                        user_agent,
+                    ),
                 )
         except IntegrityError:
             continue

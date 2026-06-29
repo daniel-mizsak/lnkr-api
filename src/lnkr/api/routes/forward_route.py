@@ -4,14 +4,20 @@ API endpoint for forwarding links.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-import ipaddress
 from contextlib import suppress
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.exc import SQLAlchemyError
 
-from lnkr.api.dependencies import check_frontend_api_key, get_cache, get_geoip_reader, get_session
+from lnkr.api.dependencies import (
+    get_cache,
+    get_geoip_reader,
+    get_ip_address,
+    get_session,
+    get_user_agent,
+)
+from lnkr.api.dependencies.header import FRONTEND_API_KEY_HEADER, check_frontend_api_key
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import (
     LinkDisabledError,
@@ -20,7 +26,7 @@ from lnkr.exceptions import (
     LinkPasswordRequiredError,
     SlugDoesNotExistError,
 )
-from lnkr.models import ClickCreate, LinkForward, LinkUnlock
+from lnkr.models import ClickCreate, ClickSource, IpAddress, LinkForward, LinkUnlock, UserAgent
 from lnkr.services.click_service import create_click
 from lnkr.services.link_service import get_cached_link, get_cached_link_validate_password
 
@@ -32,33 +38,29 @@ if TYPE_CHECKING:
 router = APIRouter(prefix=application_settings.FORWARD_PREFIX)
 
 
-def _get_ip_address(
-    is_frontend: Annotated[bool, Depends(check_frontend_api_key)],
-    x_client_ip: Annotated[str | None, Header(alias="X-Client-IP")] = None,
-) -> str | None:
-    if not is_frontend or x_client_ip is None:
-        return None
-    try:
-        ip_address = ipaddress.ip_address(x_client_ip.strip())
-    except ValueError:
-        return None
-    # Only record clicks from globally routable addresses.
-    if not ip_address.is_global:
-        return None
-    return str(ip_address)
+def _get_click_source(
+    x_frontend_api_key: Annotated[str | None, Header(alias=FRONTEND_API_KEY_HEADER)] = None,
+) -> ClickSource:
+    if check_frontend_api_key(x_frontend_api_key):
+        return ClickSource.LNKR_APP
+    return ClickSource.PUBLIC_API
 
 
-@router.get("/{slug}")
+def _set_no_store_header(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+
+
+@router.get("/{slug}", dependencies=[Depends(_set_no_store_header)])
 async def forward_to_target_url_endpoint(
     slug: str,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
-    ip_address: Annotated[str | None, Depends(_get_ip_address)],
-    response: Response,
+    click_source: Annotated[ClickSource, Depends(_get_click_source)],
+    ip_address: Annotated[IpAddress, Depends(get_ip_address)],
+    user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug."""
-    response.headers["Cache-Control"] = "no-store"
     try:
         cached_link = await get_cached_link(session, cache, slug)
     except SlugDoesNotExistError as slug_does_not_exist_error:
@@ -72,23 +74,33 @@ async def forward_to_target_url_endpoint(
         LinkPasswordRequiredError(slug=cached_link.slug).raise_http_exception()
 
     with suppress(SQLAlchemyError):
-        await create_click(session, geoip_reader, ClickCreate(ip_address=ip_address), cached_link.id)
+        await create_click(
+            session,
+            geoip_reader,
+            ClickCreate(
+                source=click_source,
+                ip_address=ip_address.ip_address,
+                browser=user_agent.browser,
+                operating_system=user_agent.operating_system,
+            ),
+            cached_link.id,
+        )
 
     return LinkForward(target_url=cached_link.target_url)
 
 
-@router.post("/{slug}/unlock")
+@router.post("/{slug}/unlock", dependencies=[Depends(_set_no_store_header)])
 async def unlock_target_url_endpoint(
     slug: str,
     link_unlock: LinkUnlock,
     session: Annotated[AsyncSession, Depends(get_session)],
     cache: Annotated[Redis, Depends(get_cache)],
     geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
-    ip_address: Annotated[str | None, Depends(_get_ip_address)],
-    response: Response,
+    click_source: Annotated[ClickSource, Depends(_get_click_source)],
+    ip_address: Annotated[IpAddress, Depends(get_ip_address)],
+    user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug if the provided password is correct."""
-    response.headers["Cache-Control"] = "no-store"
     try:
         cached_link = await get_cached_link_validate_password(session, cache, slug, link_unlock.password)
     except SlugDoesNotExistError as slug_does_not_exist_error:
@@ -101,6 +113,16 @@ async def unlock_target_url_endpoint(
         link_password_invalid_error.raise_http_exception()
 
     with suppress(SQLAlchemyError):
-        await create_click(session, geoip_reader, ClickCreate(ip_address=ip_address), cached_link.id)
+        await create_click(
+            session,
+            geoip_reader,
+            ClickCreate(
+                source=click_source,
+                ip_address=ip_address.ip_address,
+                browser=user_agent.browser,
+                operating_system=user_agent.operating_system,
+            ),
+            cached_link.id,
+        )
 
     return LinkForward(target_url=cached_link.target_url)

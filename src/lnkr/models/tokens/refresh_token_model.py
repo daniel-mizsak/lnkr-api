@@ -12,6 +12,7 @@ from sqlalchemy import DateTime, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lnkr.models.base import Base
+from lnkr.models.constraints import TOKEN_HASH_LENGTH
 
 
 class RefreshTokenRotate(BaseModel):
@@ -38,7 +39,7 @@ class RefreshToken(Base):
         index=True,
         nullable=False,
     )
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(TOKEN_HASH_LENGTH), unique=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

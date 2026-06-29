@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from testcontainers.postgres import PostgresContainer
 
 from lnkr.api.dependencies import (
-    check_frontend_api_key,
     get_cache,
     get_current_user,
     get_geoip_reader,
@@ -62,8 +61,6 @@ def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> I
     app.dependency_overrides[get_cache] = lambda: fake_async_redis
     app.dependency_overrides[get_geoip_reader] = lambda: geoip_reader
     app.dependency_overrides[verify_frontend_api_key] = lambda: None
-    app.dependency_overrides[check_frontend_api_key] = lambda: True
-
     client = TestClient(app)
     try:
         yield client

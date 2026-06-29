@@ -6,15 +6,18 @@ Tests for the forward to target url endpoint.
 
 from typing import TYPE_CHECKING
 
-import pytest
 from fastapi import status
+from sqlalchemy import select
 
+from lnkr.api.dependencies.header import CLIENT_IP_HEADER, FRONTEND_API_KEY_HEADER, USER_AGENT_HEADER
 from lnkr.config.application_settings import application_settings
+from lnkr.models import Click, ClickSource
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def test_forward_to_target_url__slug_does_not_exist(client: TestClient, slug: str) -> None:
@@ -46,32 +49,35 @@ def test_forward_to_target_url__success(
     assert data["target_url"] == target_url
 
 
-def test_forward_to_target_url__click_metadata(
+def test_forward_to_target_url__click_ip_metadata(
     client: TestClient,
     slug: str,
     target_url: str,
+    frontend_api_key: str,
     ip_address_public: str,
     ip_address_public_country_code: str,
     ip_address_private: str,
     ip_address_malformed: str,
 ) -> None:
+    frontend_api_key_headers = {FRONTEND_API_KEY_HEADER: frontend_api_key}
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
 
-    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
+    forward_url = f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}"
+    client.get(url=forward_url, headers=frontend_api_key_headers)
     client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": ip_address_public},
+        url=forward_url,
+        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_public},
     )
     client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": ip_address_private},
+        url=forward_url,
+        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_private},
     )
     client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": ip_address_malformed},
+        url=forward_url,
+        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_malformed},
     )
 
     response = client.get(
@@ -87,29 +93,59 @@ def test_forward_to_target_url__click_metadata(
     assert [item["country_code"] for item in data] == [None, None, ip_address_public_country_code, None]
 
 
-@pytest.mark.usefixtures("override_check_frontend_api_key")
-def test_forward_to_target_url__ip_address_skipped_when_not_frontend(
+def test_forward_to_target_url__click_user_agent_metadata(
     client: TestClient,
     slug: str,
     target_url: str,
+    frontend_api_key: str,
+    user_agent: str,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key, USER_AGENT_HEADER: user_agent},
+    )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data) == 1
+    click = data[0]
+    assert click["browser"] == "Chrome"
+    assert click["operating_system"] == "Mac OS X"
+
+
+async def test_forward_to_target_url__click_source(
+    client: TestClient,
+    session: AsyncSession,
+    slug: str,
+    target_url: str,
+    frontend_api_key: str,
+    frontend_api_key_invalid: str,
 ) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
 
+    client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}")
     client.get(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={"X-Client-IP": "192.168.1.1"},
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key_invalid},
+    )
+    client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
     )
 
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
-    )
-    data = response.json()
-
-    assert len(data) == 1
-    assert data[0]["ip_address"] is None
+    result = await session.execute(select(Click.source).order_by(Click.timestamp, Click.id))
+    click_sources = list(result.scalars())
+    assert click_sources == [ClickSource.PUBLIC_API, ClickSource.PUBLIC_API, ClickSource.LNKR_APP]
 
 
 def test_forward_to_target_url__disabled(client: TestClient, slug: str, target_url: str) -> None:
