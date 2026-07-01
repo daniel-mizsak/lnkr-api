@@ -21,7 +21,7 @@
     "httpx2==2.4.0",
     "psycopg[binary]==3.3.4",
     "pydantic-settings==2.14.2",
-    "redis==8.0.0",
+    "redis==8.0.1",
     "segno==1.6.6",
     "sentry-sdk==2.63.0",
     "ua-parser[regex]==1.0.2",
@@ -36,15 +36,15 @@
     { include-group = "lint" },
     "ansible-lint==26.4.0",
     "beautifulsoup4==4.15.0",
-    "coverage==7.14.2",
+    "coverage==7.14.3",
     "fakeredis==2.36.2",
     "prek==0.4.5",
     "pytest-asyncio==1.4.0",
     "pytest==9.1.1",
     "testcontainers[postgres]==4.14.2",
-    "ty==0.0.51",
+    "ty==0.0.52",
   ]
-  lint = ["ruff==0.15.18"]
+  lint = ["ruff==0.15.19"]
   deployment = ["ansible==14.1.0"]
 
 # Tools
