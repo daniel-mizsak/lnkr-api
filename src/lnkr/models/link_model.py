@@ -82,6 +82,27 @@ class LinkRead(BaseModel):
         )
 
 
+class LinkListRead(LinkRead):
+    """Link schema for listing links."""
+
+    click_count: int = Field(ge=0)
+
+    @classmethod
+    def from_link_and_click_count(cls, link: Link, click_count: int) -> LinkListRead:
+        """Create a LinkListRead instance from a Link instance and total click count."""
+        return cls(
+            slug=link.slug,
+            target_url=link.target_url,
+            status=link.status,
+            favorite=link.favorite,
+            expires_at=link.expires_at,
+            password_protected=link.password_hash is not None,
+            created_at=link.created_at,
+            updated_at=link.updated_at,
+            click_count=click_count,
+        )
+
+
 class LinkUpdate(BaseModel):
     """Link schema for updating a link."""
 

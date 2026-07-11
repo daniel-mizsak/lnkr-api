@@ -6,12 +6,13 @@ Data schemas and database models for click management.
 
 import base64
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from pydantic import AwareDatetime, BaseModel
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
+from pydantic import AwareDatetime, BaseModel, Field
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lnkr.models.base import Base
@@ -86,10 +87,88 @@ class ClickCursor(BaseModel):
         return cls.model_validate_json(decoded)
 
 
+@dataclass(frozen=True)
+class ClickAnalyticsTimeRange:
+    """Datetime range used by click analytics queries."""
+
+    start: datetime
+    end: datetime
+
+
+class ClickAnalyticsPeriodRead(BaseModel):
+    """Effective local-date range represented by an analytics response section."""
+
+    from_date: date
+    through_date: date
+    timezone: str
+
+
+class ClickAnalyticsSummaryRead(BaseModel):
+    """Reusable headline click statistics."""
+
+    total_clicks: int = Field(ge=0)
+    last_7_days_clicks: int = Field(ge=0)
+
+
+class ClickAnalyticsDailyCountRead(BaseModel):
+    """Number of clicks recorded on a calendar day."""
+
+    date: date
+    clicks: int = Field(ge=0)
+
+
+class ClickAnalyticsDailyClicksRead(BaseModel):
+    """Daily click counts and the effective period used to calculate them."""
+
+    period: ClickAnalyticsPeriodRead
+    days: list[ClickAnalyticsDailyCountRead]
+
+
+class ClickAnalyticsRecentClickRead(BaseModel):
+    """Recent click information displayed in analytics."""
+
+    timestamp: datetime
+    country_code: str | None
+
+
+class ClickAnalyticsCountryCountRead(BaseModel):
+    """Click count and share of trusted clicks with a known country."""
+
+    country_code: str
+    clicks: int = Field(ge=0)
+    percentage: float = Field(ge=0, le=100)
+
+
+class ClickAnalyticsTopCountriesRead(BaseModel):
+    """Top countries and the effective period used to calculate them."""
+
+    period: ClickAnalyticsPeriodRead
+    located_click_count: int = Field(ge=0)
+    countries: list[ClickAnalyticsCountryCountRead]
+
+
+class ClickAnalyticsRead(BaseModel):
+    """Click analytics dashboard data."""
+
+    summary: ClickAnalyticsSummaryRead
+    daily_clicks: ClickAnalyticsDailyClicksRead
+    recent_clicks: list[ClickAnalyticsRecentClickRead]
+    top_countries: ClickAnalyticsTopCountriesRead
+
+
 class Click(Base):
     """Click model saved in the database."""
 
     __tablename__ = "clicks"
+    __table_args__ = (
+        Index(
+            "ix_clicks_link_id_source_timestamp_id",
+            "link_id",
+            "source",
+            "timestamp",
+            "id",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(

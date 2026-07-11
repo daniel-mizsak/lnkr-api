@@ -18,8 +18,9 @@ from lnkr.exceptions import (
     UserDoesNotExistError,
     UserLinkLimitExceededError,
 )
-from lnkr.models import LinkCreate, LinkRead, LinkUpdate, PageNumberPaginatedRead, SlugRead, User
+from lnkr.models import LinkCreate, LinkListRead, LinkRead, LinkUpdate, PageNumberPaginatedRead, SlugRead, User
 from lnkr.models.link_model import TARGET_URL_MAX_LENGTH
+from lnkr.services.click_service import list_trusted_click_counts
 from lnkr.services.link_service import (
     create_link,
     delete_link,
@@ -163,11 +164,12 @@ async def list_links_endpoint(
     direction: Annotated[Literal["ascending", "descending"], Query()] = "descending",
     per_page: Annotated[int, Query(ge=1, le=100)] = 10,
     page: Annotated[int, Query(ge=1)] = 1,
-) -> PageNumberPaginatedRead[LinkRead]:
+) -> PageNumberPaginatedRead[LinkListRead]:
     """List links, with optional filtering."""
     links, total = await list_links(session, user, search, favorites_only, sort, direction, per_page, page)
+    click_counts_by_link_id = await list_trusted_click_counts(session, links)
     return PageNumberPaginatedRead(
-        items=[LinkRead.from_link(link) for link in links],
+        items=[LinkListRead.from_link_and_click_count(link, click_counts_by_link_id[link.id]) for link in links],
         total=total,
         page=page,
         per_page=per_page,
