@@ -42,6 +42,60 @@ def test_list_links__success(client: TestClient, slug: str, target_url: str) -> 
     assert returned_targets == expected_targets
 
 
+def test_list_links__search_matches_slug_or_target_url(client: TestClient, target_url: str) -> None:
+    links = [
+        {"slug": "search-slug", "target_url": f"{target_url}unmatched"},
+        {"slug": "other-slug", "target_url": f"{target_url}search-target"},
+        {"slug": "unrelated", "target_url": f"{target_url}unrelated"},
+    ]
+    for link in links:
+        client.post(
+            url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+            json=link,
+        )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        params={"search": "SEARCH"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert {item["slug"] for item in data} == {"search-slug", "other-slug"}
+
+
+def test_list_links__search_no_matches(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        params={"search": "missing"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
+
+
+def test_list_links__blank_search(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        params={"search": "   "},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [item["slug"] for item in data] == [slug]
+
+
 def test_list_links__query_parameters(client: TestClient, slug: str, target_url: str) -> None:
     for index in range(1, 6):
         client.post(

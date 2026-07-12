@@ -6,7 +6,7 @@ Low level database operations for link management.
 
 from typing import TYPE_CHECKING, Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from lnkr.models import Link, User
 
@@ -45,6 +45,7 @@ async def count_links_by_user(session: AsyncSession, user_id: uuid.UUID) -> int:
 async def list_links_by_user(
     session: AsyncSession,
     user: User,
+    search: str | None,
     sort: Literal["created_at", "updated_at"],
     direction: Literal["ascending", "descending"],
     per_page: int,
@@ -56,12 +57,16 @@ async def list_links_by_user(
     sort_column = Link.created_at if sort == "created_at" else Link.updated_at
     order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
 
-    statement = (
-        select(Link)
-        .where(Link.user_id == user.id)
-        .order_by(order_clause, Link.id.desc())
-        .offset(offset)
-        .limit(per_page)
-    )
+    statement = select(Link).where(Link.user_id == user.id)
+    if search:
+        statement = statement.where(
+            or_(
+                # TODO: For larger-scale text filtering consider using pg_trgm extension for better performance.
+                Link.slug.icontains(search, autoescape=True),
+                Link.target_url.icontains(search, autoescape=True),
+            )
+        )
+
+    statement = statement.order_by(order_clause, Link.id.desc()).offset(offset).limit(per_page)
     result = await session.execute(statement)
     return list(result.scalars().all())

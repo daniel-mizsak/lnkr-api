@@ -193,14 +193,17 @@ def _generate_qr_code(content: str) -> bytes:
 async def list_links(
     session: AsyncSession,
     user: User,
+    search: str | None,
     sort: Literal["created_at", "updated_at"],
     direction: Literal["ascending", "descending"],
     per_page: int,
     page: int,
 ) -> list[Link]:
     """List all links for a given user."""
+    if search is not None:
+        search = search.strip()
     per_page = min(per_page, 100)
-    return await link_database.list_links_by_user(session, user, sort, direction, per_page, page)
+    return await link_database.list_links_by_user(session, user, search, sort, direction, per_page, page)
 
 
 _password_hasher = PasswordHasher()

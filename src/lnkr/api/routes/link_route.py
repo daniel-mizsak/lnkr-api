@@ -19,6 +19,7 @@ from lnkr.exceptions import (
     UserLinkLimitExceededError,
 )
 from lnkr.models import LinkCreate, LinkRead, LinkUpdate, SlugRead, User
+from lnkr.models.link_model import TARGET_URL_MAX_LENGTH
 from lnkr.services.link_service import (
     create_link,
     delete_link,
@@ -156,11 +157,12 @@ async def delete_link_endpoint(
 async def list_links_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
+    search: Annotated[str | None, Query(max_length=TARGET_URL_MAX_LENGTH)] = None,
     sort: Annotated[Literal["created_at", "updated_at"], Query()] = "updated_at",
     direction: Annotated[Literal["ascending", "descending"], Query()] = "descending",
     per_page: Annotated[int, Query(ge=1, le=100)] = 10,
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[LinkRead]:
-    """List all links that have a target url."""
-    links = await list_links(session, user, sort, direction, per_page, page)
+    """List links, optionally filtering by slug or target URL."""
+    links = await list_links(session, user, search, sort, direction, per_page, page)
     return [LinkRead.from_link(link) for link in links]
