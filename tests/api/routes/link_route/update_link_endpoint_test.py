@@ -194,6 +194,51 @@ def test_update_link__cannot_clear_status(client: TestClient, slug: str, target_
     assert error["type"] == "value_error"
 
 
+def test_update_link__favorite(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"favorite": True},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["favorite"] is True
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"favorite": False},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert data["favorite"] is False
+
+
+def test_update_link__cannot_clear_favorite(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.patch(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+        json={"favorite": None},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["input"] == {"favorite": None}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == "Value error, favorite cannot be cleared"
+    assert error["type"] == "value_error"
+
+
 def test_update_link__expires_at(client: TestClient, slug: str, target_url: str, expires_at_future: datetime) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",

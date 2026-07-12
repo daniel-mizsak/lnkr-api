@@ -46,18 +46,21 @@ async def list_links_by_user(
     session: AsyncSession,
     user: User,
     search: str | None,
+    favorites_only: bool,  # noqa: FBT001
     sort: Literal["created_at", "updated_at"],
     direction: Literal["ascending", "descending"],
     per_page: int,
     page: int,
 ) -> list[Link]:
-    """List all links owned by a user."""
+    """List links for a given user, with optional filtering."""
     offset = (page - 1) * per_page
 
     sort_column = Link.created_at if sort == "created_at" else Link.updated_at
     order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
 
     statement = select(Link).where(Link.user_id == user.id)
+    if favorites_only:
+        statement = statement.where(Link.favorite.is_(True))
     if search:
         statement = statement.where(
             or_(
