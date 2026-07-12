@@ -194,16 +194,26 @@ async def list_links(
     session: AsyncSession,
     user: User,
     search: str | None,
+    favorites_only: bool,  # noqa: FBT001
     sort: Literal["created_at", "updated_at"],
     direction: Literal["ascending", "descending"],
     per_page: int,
     page: int,
 ) -> list[Link]:
-    """List all links for a given user."""
+    """List links for a given user, with optional filtering."""
     if search is not None:
         search = search.strip()
     per_page = min(per_page, 100)
-    return await link_database.list_links_by_user(session, user, search, sort, direction, per_page, page)
+    return await link_database.list_links_by_user(
+        session,
+        user,
+        search,
+        favorites_only,
+        sort,
+        direction,
+        per_page,
+        page,
+    )
 
 
 _password_hasher = PasswordHasher()

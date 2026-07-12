@@ -242,6 +242,7 @@ def test_create_link__success(
         "slug",
         "target_url",
         "status",
+        "favorite",
         "expires_at",
         "password_protected",
         "created_at",
@@ -250,6 +251,7 @@ def test_create_link__success(
     assert data["slug"] == slug
     assert data["target_url"] == target_url
     assert data["status"] == "active"
+    assert data["favorite"] is False
     assert datetime.fromisoformat(data["expires_at"]) == expires_at_future
     assert data["password_protected"] is True
 

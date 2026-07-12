@@ -10,7 +10,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lnkr.models.base import Base
@@ -61,6 +61,7 @@ class LinkRead(BaseModel):
     slug: str
     target_url: str
     status: LinkStatus
+    favorite: bool
     expires_at: AwareDatetime | None
     password_protected: bool
     created_at: datetime
@@ -73,6 +74,7 @@ class LinkRead(BaseModel):
             slug=link.slug,
             target_url=link.target_url,
             status=link.status,
+            favorite=link.favorite,
             expires_at=link.expires_at,
             password_protected=link.password_hash is not None,
             created_at=link.created_at,
@@ -88,6 +90,7 @@ class LinkUpdate(BaseModel):
     target_url: HttpUrl | None = Field(default=None, max_length=TARGET_URL_MAX_LENGTH)
     expires_at: AwareDatetime | None = None
     status: LinkStatus | None = None
+    favorite: bool | None = None
     password: LinkPassword | None = None
 
     @model_validator(mode="after")
@@ -100,6 +103,9 @@ class LinkUpdate(BaseModel):
             raise ValueError(msg)
         if "status" in self.model_fields_set and self.status is None:
             msg = "status cannot be cleared"
+            raise ValueError(msg)
+        if "favorite" in self.model_fields_set and self.favorite is None:
+            msg = "favorite cannot be cleared"
             raise ValueError(msg)
         return self
 
@@ -152,6 +158,7 @@ class Link(Base):
         default=LinkStatus.ACTIVE,
         nullable=False,
     )
+    favorite: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -195,5 +202,7 @@ class Link(Base):
             self.expires_at = link_update.expires_at
         if "status" in fields_set and link_update.status is not None:
             self.status = link_update.status
+        if "favorite" in fields_set and link_update.favorite is not None:
+            self.favorite = link_update.favorite
         if "password" in fields_set:
             self.password_hash = password_hash

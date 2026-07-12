@@ -68,6 +68,7 @@ def test_get_link__success(client: TestClient, slug: str, target_url: str) -> No
         "slug",
         "target_url",
         "status",
+        "favorite",
         "expires_at",
         "password_protected",
         "created_at",
@@ -76,6 +77,7 @@ def test_get_link__success(client: TestClient, slug: str, target_url: str) -> No
     assert data["slug"] == slug
     assert data["target_url"] == target_url
     assert data["status"] == "active"
+    assert data["favorite"] is False
     assert data["expires_at"] is None
 
     now = datetime.now(UTC)

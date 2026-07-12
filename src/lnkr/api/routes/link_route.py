@@ -158,11 +158,12 @@ async def list_links_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
     search: Annotated[str | None, Query(max_length=TARGET_URL_MAX_LENGTH)] = None,
+    favorites_only: Annotated[bool, Query()] = False,  # noqa: FBT002
     sort: Annotated[Literal["created_at", "updated_at"], Query()] = "updated_at",
     direction: Annotated[Literal["ascending", "descending"], Query()] = "descending",
     per_page: Annotated[int, Query(ge=1, le=100)] = 10,
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> list[LinkRead]:
-    """List links, optionally filtering by slug or target URL."""
-    links = await list_links(session, user, search, sort, direction, per_page, page)
+    """List links, with optional filtering."""
+    links = await list_links(session, user, search, favorites_only, sort, direction, per_page, page)
     return [LinkRead.from_link(link) for link in links]
