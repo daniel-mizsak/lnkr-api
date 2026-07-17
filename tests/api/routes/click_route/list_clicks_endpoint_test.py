@@ -59,6 +59,26 @@ def test_list_clicks__slug_not_owned_by_user(
     assert error["type"] == "slug_not_owned_by_user"
 
 
+def test_list_clicks__invalid_cursor(client: TestClient, slug: str, target_url: str) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = client.get(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
+        params={"cursor": "invalid"},
+    )
+    data = response.json()
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    error = data["detail"][0]
+    assert error["input"] == "invalid"
+    assert error["loc"] == ["query", "cursor"]
+    assert error["msg"] == "The provided cursor is invalid"
+    assert error["type"] == "cursor_invalid"
+
+
 def test_list_clicks__empty(client: TestClient, slug: str, target_url: str) -> None:
     client.post(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
@@ -71,7 +91,7 @@ def test_list_clicks__empty(client: TestClient, slug: str, target_url: str) -> N
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert data == []
+    assert data["items"] == []
 
 
 def test_list_clicks__public_api_clicks_excluded(client: TestClient, slug: str, target_url: str) -> None:
@@ -87,7 +107,7 @@ def test_list_clicks__public_api_clicks_excluded(client: TestClient, slug: str, 
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert data == []
+    assert data["items"] == []
 
 
 def test_list_clicks__success(
@@ -123,11 +143,11 @@ def test_list_clicks__success(
     )
     data = response.json()
 
-    timestamps = [item["timestamp"] for item in data]
+    timestamps = [item["timestamp"] for item in data["items"]]
     assert timestamps == sorted(timestamps, reverse=True)
     assert response.status_code == status.HTTP_200_OK
-    assert len(data) == 2
-    for item in data:
+    assert len(data["items"]) == 2
+    for item in data["items"]:
         item_timestamp = datetime.fromisoformat(item["timestamp"])
         assert timestamp < item_timestamp < timestamp + timedelta(seconds=1)
         assert set(item.keys()) == {
@@ -137,7 +157,42 @@ def test_list_clicks__success(
             "browser",
             "operating_system",
         }
-    assert {item["ip_address"] for item in data} == {None, ip_address_public}
-    assert {item["country_code"] for item in data} == {None, ip_address_public_country_code}
-    assert {item["browser"] for item in data} == {None, "Chrome"}
-    assert {item["operating_system"] for item in data} == {None, "Mac OS X"}
+    assert {item["ip_address"] for item in data["items"]} == {None, ip_address_public}
+    assert {item["country_code"] for item in data["items"]} == {None, ip_address_public_country_code}
+    assert {item["browser"] for item in data["items"]} == {None, "Chrome"}
+    assert {item["operating_system"] for item in data["items"]} == {None, "Mac OS X"}
+
+
+def test_list_clicks__cursor_pagination(
+    client: TestClient,
+    slug: str,
+    target_url: str,
+    frontend_api_key: str,
+) -> None:
+    client.post(
+        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+    for _ in range(3):
+        client.get(
+            url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}",
+            headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
+        )
+
+    clicks_url = f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks"
+    response = client.get(url=clicks_url, params={"limit": 2})
+    first_page = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(first_page["items"]) == 2
+    assert first_page["next_cursor"] is not None
+
+    response = client.get(
+        url=clicks_url,
+        params={"limit": 2, "cursor": first_page["next_cursor"]},
+    )
+    second_page = response.json()
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(second_page["items"]) == 1
+    assert second_page["next_cursor"] is None

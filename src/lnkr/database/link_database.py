@@ -51,18 +51,18 @@ async def list_links_by_user(
     direction: Literal["ascending", "descending"],
     per_page: int,
     page: int,
-) -> list[Link]:
-    """List links for a given user, with optional filtering."""
+) -> tuple[list[Link], int]:
+    """List and count links for a given user, with optional filtering."""
     offset = (page - 1) * per_page
 
     sort_column = Link.created_at if sort == "created_at" else Link.updated_at
     order_clause = sort_column.asc() if direction == "ascending" else sort_column.desc()
 
-    statement = select(Link).where(Link.user_id == user.id)
+    filters = [Link.user_id == user.id]
     if favorites_only:
-        statement = statement.where(Link.favorite.is_(True))
+        filters.append(Link.favorite.is_(True))
     if search:
-        statement = statement.where(
+        filters.append(
             or_(
                 # TODO: For larger-scale text filtering consider using pg_trgm extension for better performance.
                 Link.slug.icontains(search, autoescape=True),
@@ -70,6 +70,9 @@ async def list_links_by_user(
             )
         )
 
-    statement = statement.order_by(order_clause, Link.id.desc()).offset(offset).limit(per_page)
-    result = await session.execute(statement)
-    return list(result.scalars().all())
+    count_statement = select(func.count()).select_from(Link).where(*filters)
+    total = (await session.execute(count_statement)).scalar_one()
+
+    links_statement = select(Link).where(*filters).order_by(order_clause, Link.id.desc()).offset(offset).limit(per_page)
+    links = list((await session.execute(links_statement)).scalars().all())
+    return links, total

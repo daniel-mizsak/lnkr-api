@@ -39,6 +39,30 @@ class FrontendApiKeyInvalidError(LnkrError):
         )
 
 
+class CursorInvalidError(LnkrError):
+    """Raised when a pagination cursor is invalid."""
+
+    def __init__(self, cursor: str) -> None:
+        """Initialize with default error message."""
+        msg = "The provided cursor is invalid"
+        super().__init__(msg)
+        self.cursor = cursor
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                {
+                    "input": self.cursor,
+                    "loc": ["query", "cursor"],
+                    "msg": str(self),
+                    "type": "cursor_invalid",
+                },
+            ],
+        )
+
+
 class LoginTokenInvalidError(LnkrError):
     """Raised when a login token is invalid, used or expired."""
 

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import SQLAlchemyError
 
 from lnkr.database import click_database
-from lnkr.models import Click, ClickCreate, Link
+from lnkr.models import Click, ClickCreate, ClickCursor, Link
 from lnkr.services.geoip_service import get_country_code_from_ip
 
 if TYPE_CHECKING:
@@ -40,7 +40,15 @@ async def create_click(
     return click
 
 
-async def list_clicks(session: AsyncSession, link: Link, per_page: int, page: int) -> list[Click]:
-    """List all clicks for a given link."""
-    per_page = min(per_page, 100)
-    return await click_database.list_clicks_by_link(session, link, per_page, page)
+async def list_clicks(
+    session: AsyncSession,
+    link: Link,
+    limit: int,
+    cursor: ClickCursor | None,
+) -> tuple[list[Click], str | None]:
+    """List a cursor-paginated collection of trusted clicks for a given link."""
+    limit = min(limit, 100)
+    clicks, has_next = await click_database.list_clicks_by_link(session, link, limit, cursor)
+
+    next_cursor = ClickCursor.from_click(clicks[-1]).encode() if has_next else None
+    return clicks, next_cursor

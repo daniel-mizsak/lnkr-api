@@ -5,18 +5,47 @@ General fixtures.
 """
 
 import ipaddress
+import os
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
 from geoip2.errors import AddressNotFoundError
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from testcontainers.postgres import PostgresContainer
 
 from lnkr.config.application_settings import application_settings
 from lnkr.models import User
+from lnkr.models.base import Base
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from geoip2.database import Reader
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
+
+@pytest.fixture(name="engine", scope="session")
+async def engine_fixture() -> AsyncGenerator[AsyncEngine]:
+    with PostgresContainer(str(os.getenv("POSTGRES_IMAGE")), driver="psycopg") as container:
+        engine = create_async_engine(container.get_connection_url())
+        try:
+            yield engine
+        finally:
+            await engine.dispose()
+
+
+@pytest.fixture(name="session")
+async def session_fixture(engine: AsyncEngine, user: User, user_other: User) -> AsyncGenerator[AsyncSession]:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        session.add_all([user, user_other])
+        await session.commit()
+        yield session
 
 
 @pytest.fixture(name="email")
