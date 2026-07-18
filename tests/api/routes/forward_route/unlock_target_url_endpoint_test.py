@@ -93,7 +93,7 @@ def test_unlock_target_url__wrong_password(client: TestClient, slug: str, target
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == []
+    assert response.json()["items"] == []
 
 
 def test_unlock_target_url__success(
@@ -123,7 +123,7 @@ def test_unlock_target_url__success(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.json()) == 1
+    assert len(response.json()["items"]) == 1
 
 
 def test_unlock_target_url__link_without_password(

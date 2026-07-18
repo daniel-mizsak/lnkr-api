@@ -4,12 +4,13 @@ Data schemas and database models for click management.
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import base64
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +19,9 @@ from lnkr.models.constraints import COUNTRY_CODE_LENGTH, IP_ADDRESS_MAX_LENGTH, 
 
 if TYPE_CHECKING:
     from lnkr.models import Link
+
+
+CLICK_CURSOR_MAX_LENGTH = 512
 
 
 class ClickSource(StrEnum):
@@ -58,6 +62,28 @@ class ClickRead(BaseModel):
             browser=click.browser,
             operating_system=click.operating_system,
         )
+
+
+class ClickCursor(BaseModel):
+    """Opaque cursor values for listing clicks."""
+
+    timestamp: AwareDatetime
+    id: uuid.UUID
+
+    @classmethod
+    def from_click(cls, click: Click) -> ClickCursor:
+        """Create a cursor from a click."""
+        return cls(timestamp=click.timestamp, id=click.id)
+
+    def encode(self) -> str:
+        """Encode the cursor as an opaque URL-safe string."""
+        return base64.urlsafe_b64encode(self.model_dump_json().encode()).decode()
+
+    @classmethod
+    def decode(cls, cursor: str) -> ClickCursor:
+        """Decode and validate an opaque cursor string."""
+        decoded = base64.urlsafe_b64decode(cursor)
+        return cls.model_validate_json(decoded)
 
 
 class Click(Base):

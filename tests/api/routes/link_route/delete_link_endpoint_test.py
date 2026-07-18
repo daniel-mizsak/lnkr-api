@@ -100,7 +100,7 @@ def test_delete_link__reset_click_count(
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(data) == 2
+    assert len(data["items"]) == 2
 
     client.delete(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}")
     client.post(
@@ -114,4 +114,4 @@ def test_delete_link__reset_click_count(
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(data) == 0
+    assert len(data["items"]) == 0

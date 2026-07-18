@@ -86,11 +86,11 @@ def test_forward_to_target_url__click_ip_metadata(
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(data) == 4
+    assert len(data["items"]) == 4
     # Clicks are returned most recent first: malformed, private, public, then no IP.
     # Only the globally routable address (and its resolved country) is stored.
-    assert [item["ip_address"] for item in data] == [None, None, ip_address_public, None]
-    assert [item["country_code"] for item in data] == [None, None, ip_address_public_country_code, None]
+    assert [item["ip_address"] for item in data["items"]] == [None, None, ip_address_public, None]
+    assert [item["country_code"] for item in data["items"]] == [None, None, ip_address_public_country_code, None]
 
 
 def test_forward_to_target_url__click_user_agent_metadata(
@@ -114,8 +114,8 @@ def test_forward_to_target_url__click_user_agent_metadata(
     )
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert len(data) == 1
-    click = data[0]
+    assert len(data["items"]) == 1
+    click = data["items"][0]
     assert click["browser"] == "Chrome"
     assert click["operating_system"] == "Mac OS X"
 
@@ -210,7 +210,7 @@ def test_forward_to_target_url__password(
         url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == []
+    assert response.json()["items"] == []
 
 
 def test_forward_to_target_url__extending_expiry_revives_link(

@@ -199,8 +199,8 @@ async def list_links(
     direction: Literal["ascending", "descending"],
     per_page: int,
     page: int,
-) -> list[Link]:
-    """List links for a given user, with optional filtering."""
+) -> tuple[list[Link], int]:
+    """List and count links for a given user, with optional filtering."""
     if search is not None:
         search = search.strip()
     per_page = min(per_page, 100)
