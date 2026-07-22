@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
+REFRESH_TOKEN_ENTROPY_BYTES = 32
+
+
 async def create_and_save_refresh_token(session: AsyncSession, user_id: uuid.UUID) -> str:
     """Create a refresh token and save it to the database."""
     try:
@@ -73,7 +76,7 @@ async def _create_refresh_token_without_commit(session: AsyncSession, user_id: u
     maximum_unique_refresh_token_generation_attempts = 5
 
     for _ in range(maximum_unique_refresh_token_generation_attempts):
-        refresh_token_value = secrets.token_urlsafe(32)
+        refresh_token_value = secrets.token_urlsafe(REFRESH_TOKEN_ENTROPY_BYTES)
         token_hash = _hash_token(refresh_token_value)
 
         try:

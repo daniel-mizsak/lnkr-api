@@ -14,12 +14,12 @@ from lnkr.config.application_settings import application_settings
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from fastapi.testclient import TestClient
+    from httpx2 import AsyncClient
 
 
-def test_unlock_target_url__slug_does_not_exist(client: TestClient, slug: str, password: str) -> None:
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+async def test_unlock_target_url__slug_does_not_exist(client: AsyncClient, slug: str, password: str) -> None:
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
     )
     data = response.json()
@@ -32,14 +32,19 @@ def test_unlock_target_url__slug_does_not_exist(client: TestClient, slug: str, p
     assert error["type"] == "slug_does_not_exist"
 
 
-def test_unlock_target_url__missing_password(client: TestClient, slug: str, target_url: str, password: str) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+async def test_unlock_target_url__missing_password(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    password: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={},
     )
     data = response.json()
@@ -51,14 +56,19 @@ def test_unlock_target_url__missing_password(client: TestClient, slug: str, targ
     assert error["type"] == "missing"
 
 
-def test_unlock_target_url__empty_password(client: TestClient, slug: str, target_url: str, password: str) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+async def test_unlock_target_url__empty_password(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    password: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": ""},
     )
     data = response.json()
@@ -70,14 +80,19 @@ def test_unlock_target_url__empty_password(client: TestClient, slug: str, target
     assert error["type"] == "string_too_short"
 
 
-def test_unlock_target_url__wrong_password(client: TestClient, slug: str, target_url: str, password: str) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+async def test_unlock_target_url__wrong_password(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    password: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": f"wrong-{password}"},
     )
     data = response.json()
@@ -89,27 +104,27 @@ def test_unlock_target_url__wrong_password(client: TestClient, slug: str, target
     assert error["type"] == "link_password_invalid"
 
     # No click recorded.
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
+    response = await client.get(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["items"] == []
 
 
-def test_unlock_target_url__success(
-    client: TestClient,
+async def test_unlock_target_url__matching_password(
+    client: AsyncClient,
     slug: str,
     target_url: str,
     password: str,
     frontend_api_key: str,
 ) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
         headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
     )
@@ -119,26 +134,26 @@ def test_unlock_target_url__success(
     assert data["target_url"] == target_url
 
     # Click recorded.
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}/clicks",
+    response = await client.get(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.json()["items"]) == 1
 
 
-def test_unlock_target_url__link_without_password(
-    client: TestClient,
+async def test_unlock_target_url__link_without_password(
+    client: AsyncClient,
     slug: str,
     target_url: str,
     password: str,
 ) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
     )
     data = response.json()
@@ -147,18 +162,18 @@ def test_unlock_target_url__link_without_password(
     assert data["target_url"] == target_url
 
 
-def test_unlock_target_url__disabled(client: TestClient, slug: str, target_url: str, password: str) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+async def test_unlock_target_url__disabled(client: AsyncClient, slug: str, target_url: str, password: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url, "password": password},
     )
-    client.patch(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}",
+    await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"status": "disabled"},
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
     )
     data = response.json()
@@ -168,15 +183,15 @@ def test_unlock_target_url__disabled(client: TestClient, slug: str, target_url: 
     assert error["type"] == "link_disabled"
 
 
-def test_unlock_target_url__expired(
-    client: TestClient,
+async def test_unlock_target_url__expired(
+    client: AsyncClient,
     slug: str,
     target_url: str,
     password: str,
     expires_at_past: datetime,
 ) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={
             "slug": slug,
             "target_url": target_url,
@@ -185,8 +200,8 @@ def test_unlock_target_url__expired(
         },
     )
 
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.FORWARD_PREFIX}/{slug}/unlock",
+    response = await client.post(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
     )
     data = response.json()

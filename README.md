@@ -55,8 +55,6 @@ just deploy-development
 
 ### Future improvements
 
-- Add tests covering api dependencies.
-- Use `async` API calls in tests.
 - Add callback URL to request login token endpoint and attach to login_url.
 - Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.

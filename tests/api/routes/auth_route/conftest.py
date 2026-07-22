@@ -5,33 +5,34 @@ Fixtures used in testing auth api routes.
 """
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock
+from unittest import mock
 
 import pytest
 from bs4 import BeautifulSoup
 from fastapi import status
 
 from lnkr.api.dependencies import verify_frontend_api_key
+from lnkr.api.routes import auth_route
 from lnkr.config.application_settings import application_settings
 from lnkr.main import app
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import AsyncGenerator, Generator
 
-    from fastapi.testclient import TestClient
+    from httpx2 import AsyncClient
 
 
 @pytest.fixture(name="mock_send_email")
-def mock_send_email_fixture(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
-    mock_send_email = AsyncMock()
-    monkeypatch.setattr("lnkr.api.routes.auth_route.send_email", mock_send_email)
-    return mock_send_email
+def mock_send_email_fixture() -> Generator[mock.AsyncMock]:
+    mock_send_email = mock.AsyncMock()
+    with mock.patch.object(auth_route, "send_email", mock_send_email):
+        yield mock_send_email
 
 
 @pytest.fixture(name="issued_login_token")
-def issued_login_token_fixture(client: TestClient, mock_send_email: AsyncMock, email: str) -> str:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/request-login-token",
+async def issued_login_token_fixture(client: AsyncClient, mock_send_email: mock.AsyncMock, email: str) -> str:
+    await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/request-login-token",
         json={"email": email},
     )
 
@@ -47,9 +48,9 @@ def issued_login_token_fixture(client: TestClient, mock_send_email: AsyncMock, e
 
 
 @pytest.fixture(name="issued_auth_tokens")
-def issued_auth_tokens_fixture(client: TestClient, issued_login_token: str) -> dict[str, str]:
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.AUTH_PREFIX}/verify-login-token",
+async def issued_auth_tokens_fixture(client: AsyncClient, issued_login_token: str) -> dict[str, str]:
+    response = await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
         json={"login_token_value": issued_login_token},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -57,7 +58,7 @@ def issued_auth_tokens_fixture(client: TestClient, issued_login_token: str) -> d
 
 
 @pytest.fixture()
-def override_verify_frontend_api_key(client: TestClient) -> Generator[None]:  # noqa: ARG001
+async def override_verify_frontend_api_key(client: AsyncClient) -> AsyncGenerator[None]:  # noqa: ARG001
     # Depend on `client` so this fixture runs after the default override is installed,
     # then pop it so the real dependency runs and raises on the missing header.
     original_frontend_api_key = app.dependency_overrides.pop(verify_frontend_api_key, None)

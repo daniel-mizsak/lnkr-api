@@ -60,3 +60,36 @@ async def test_list_clicks_by_link__cursor_pagination_uses_id_to_break_timestamp
 
     assert [click.id for click in second_page] == [click_ids[0]]
     assert has_next is False
+
+
+async def test_list_clicks_by_link__returns_only_trusted_clicks_for_requested_link(
+    session: AsyncSession,
+    user: User,
+    slug: str,
+    slug_other: str,
+    target_url: str,
+) -> None:
+    requested_link = Link(slug=slug, target_url=target_url, user=user)
+    other_link = Link(slug=slug_other, target_url=target_url, user=user)
+    session.add_all([requested_link, other_link])
+    await session.flush()
+
+    trusted_click = Click(source=ClickSource.LNKR_APP, link_id=requested_link.id)
+    session.add_all(
+        [
+            trusted_click,
+            Click(source=ClickSource.PUBLIC_API, link_id=requested_link.id),
+            Click(source=ClickSource.LNKR_APP, link_id=other_link.id),
+        ]
+    )
+    await session.commit()
+
+    clicks, has_next = await click_database.list_clicks_by_link(
+        session,
+        requested_link,
+        limit=10,
+        cursor=None,
+    )
+
+    assert [click.id for click in clicks] == [trusted_click.id]
+    assert has_next is False

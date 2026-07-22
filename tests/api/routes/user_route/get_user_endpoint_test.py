@@ -11,11 +11,11 @@ from fastapi import status
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
-    from fastapi.testclient import TestClient
+    from httpx2 import AsyncClient
 
 
-def test_get_user__success(client: TestClient) -> None:
-    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.USER_PREFIX}")
+async def test_get_user__authenticated_user(client: AsyncClient) -> None:
+    response = await client.get(url=f"{application_settings.USER_PREFIX}")
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK

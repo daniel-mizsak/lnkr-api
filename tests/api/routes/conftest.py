@@ -1,15 +1,15 @@
 """
-Fixtures used in testing the api.
+Fixtures used in testing API routes.
 
 @author "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import AsyncIterator, Callable, Generator
 from typing import TYPE_CHECKING
 
 import pytest
 from fakeredis import FakeAsyncRedis
-from fastapi.testclient import TestClient
+from httpx2 import ASGITransport, AsyncClient
 
 from lnkr.api.dependencies import (
     get_cache,
@@ -18,6 +18,7 @@ from lnkr.api.dependencies import (
     get_session,
     verify_frontend_api_key,
 )
+from lnkr.config.application_settings import application_settings
 from lnkr.main import app
 from lnkr.models import User
 
@@ -26,9 +27,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-# TODO: Use `async` API calls in tests.
 @pytest.fixture(name="client")
-def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> Iterator[TestClient]:
+async def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> AsyncIterator[AsyncClient]:
     fake_async_redis = FakeAsyncRedis(decode_responses=True)
 
     app.dependency_overrides[get_session] = lambda: session
@@ -36,12 +36,15 @@ def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> I
     app.dependency_overrides[get_cache] = lambda: fake_async_redis
     app.dependency_overrides[get_geoip_reader] = lambda: geoip_reader
     app.dependency_overrides[verify_frontend_api_key] = lambda: None
-    client = TestClient(app)
+    transport = ASGITransport(app=app)
     try:
-        yield client
+        # Match Starlette TestClient's default base_url: "http://testserver".
+        base_url = f"http://testserver{application_settings.API_VERSION_PREFIX}"
+        async with AsyncClient(transport=transport, base_url=base_url) as client:
+            yield client
     finally:
-        client.close()
         app.dependency_overrides.clear()
+        await fake_async_redis.aclose()
 
 
 OverrideGetCurrentUserFunction = Callable[[User], None]
@@ -49,12 +52,13 @@ OverrideGetCurrentUserFixture = Generator[OverrideGetCurrentUserFunction]
 
 
 @pytest.fixture()
-def override_get_current_user() -> OverrideGetCurrentUserFixture:
-    original_user = app.dependency_overrides.get(get_current_user)
+def override_get_current_user(client: AsyncClient) -> OverrideGetCurrentUserFixture:  # noqa: ARG001
+    original_user = app.dependency_overrides[get_current_user]
 
     def _override(user: User) -> None:
         app.dependency_overrides[get_current_user] = lambda: user
 
-    yield _override
-    if original_user is not None:
+    try:
+        yield _override
+    finally:
         app.dependency_overrides[get_current_user] = original_user

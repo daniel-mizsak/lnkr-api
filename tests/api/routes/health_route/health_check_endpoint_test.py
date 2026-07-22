@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING
 
 from fastapi import status
 
-from lnkr.config.application_settings import ApplicationEnvironment, application_settings
+from lnkr.config.application_settings import ApplicationEnvironment
 
 if TYPE_CHECKING:
-    from fastapi.testclient import TestClient
+    from httpx2 import AsyncClient
 
 
-def test_health_check__success(client: TestClient) -> None:
-    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}/health")
+async def test_health_check__healthy_dependencies(client: AsyncClient) -> None:
+    response = await client.get(url="/health")
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
