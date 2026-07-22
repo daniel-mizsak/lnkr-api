@@ -6,6 +6,7 @@ General fixtures.
 
 import ipaddress
 import os
+import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -16,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
 from lnkr.config.application_settings import application_settings
-from lnkr.models import User
+from lnkr.models import Link, LinkCache, LinkStatus, User
 from lnkr.models.base import Base
 
 if TYPE_CHECKING:
@@ -29,7 +30,11 @@ if TYPE_CHECKING:
 @pytest.fixture(name="engine", scope="session")
 async def engine_fixture() -> AsyncGenerator[AsyncEngine]:
     with PostgresContainer(str(os.getenv("POSTGRES_IMAGE")), driver="psycopg") as container:
-        engine = create_async_engine(container.get_connection_url())
+        engine = create_async_engine(
+            container.get_connection_url(),
+            # Disable prepared statements because recreating PostgreSQL enums between tests invalidates cached OIDs.
+            connect_args={"prepare_threshold": None},
+        )
         try:
             yield engine
         finally:
@@ -53,19 +58,34 @@ def email_fixture() -> str:
     return "user@example.com"
 
 
+@pytest.fixture(name="user_id")
+def user_id_fixture() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture(name="user_id_other")
+def user_id_other_fixture() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 @pytest.fixture(name="user")
-def user_fixture(email: str) -> User:
-    return User(email=email)
+def user_fixture(user_id: uuid.UUID, email: str) -> User:
+    return User(id=user_id, email=email)
 
 
 @pytest.fixture(name="user_other")
-def user_other_fixture(email: str) -> User:
-    return User(email=f"other_{email}")
+def user_other_fixture(user_id_other: uuid.UUID, email: str) -> User:
+    return User(id=user_id_other, email=f"other_{email}")
 
 
 @pytest.fixture(name="slug")
 def slug_fixture() -> str:
     return "slug"
+
+
+@pytest.fixture(name="slug_other")
+def slug_other_fixture() -> str:
+    return "other-slug"
 
 
 @pytest.fixture(name="target_url")
@@ -76,6 +96,24 @@ def target_url_fixture() -> str:
 @pytest.fixture(name="target_url_invalid")
 def target_url_invalid_fixture() -> str:
     return "example.com/"
+
+
+@pytest.fixture(name="link")
+def link_fixture(user: User, slug: str, target_url: str) -> Link:
+    return Link(
+        id=uuid.uuid4(),
+        slug=slug,
+        target_url=target_url,
+        status=LinkStatus.ACTIVE,
+        favorite=False,
+        user=user,
+        user_id=user.id,
+    )
+
+
+@pytest.fixture(name="cached_link")
+def cached_link_fixture(link: Link) -> LinkCache:
+    return LinkCache.from_link(link)
 
 
 @pytest.fixture(name="password")

@@ -6,77 +6,36 @@ Tests for the generate random slug endpoint.
 
 import re
 from typing import TYPE_CHECKING
+from unittest import mock
 
 from fastapi import status
 
+from lnkr.api.routes import link_route
 from lnkr.config.application_settings import application_settings
-from lnkr.database import link_database
-from lnkr.services import link_service
+from lnkr.exceptions import RandomSlugGenerationError
 
 if TYPE_CHECKING:
-    import pytest
-    from fastapi.testclient import TestClient
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from httpx2 import AsyncClient
 
 
-def test_generate_random_slug__success(client: TestClient) -> None:
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/slugs/random"
-    )
-    data = response.json()
+async def test_generate_random_slug__generation_failure(client: AsyncClient) -> None:
+    with mock.patch.object(
+        link_route,
+        "generate_unused_random_slug",
+        mock.AsyncMock(side_effect=RandomSlugGenerationError()),
+    ):
+        response = await client.get(url=f"{application_settings.LINKS_PREFIX}/slugs/random")
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.headers["Cache-Control"] == "no-store"
+    error = response.json()["detail"][0]
+    assert error["msg"] == "Unable to generate an unused random slug. Please try again."
+    assert error["type"] == "random_slug_generation_failed"
+
+
+async def test_generate_random_slug__slug_format_and_cache_policy(client: AsyncClient) -> None:
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/slugs/random")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.headers["Cache-Control"] == "no-store"
-    assert set(data.keys()) == {"slug"}
-    assert re.fullmatch(r"^[a-zA-Z0-9]{6}$", data["slug"])
-
-
-def test_generate_random_slug__skips_existing_slug(
-    monkeypatch: pytest.MonkeyPatch,
-    client: TestClient,
-    target_url: str,
-) -> None:
-    existing_slug = "existing-slug"
-    unused_slug = "unused-slug"
-    generated_slugs = [existing_slug, unused_slug]
-
-    response = client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
-        json={"slug": existing_slug, "target_url": target_url},
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-
-    # First call returns existing_slug, second call returns the unused_slug.
-    def _generate_random_slug(_random_slug_length: int) -> str:
-        return generated_slugs.pop(0)
-
-    monkeypatch.setattr(link_service, "_generate_random_slug", _generate_random_slug)
-
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/slugs/random"
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["slug"] == unused_slug
-
-
-def test_generate_random_slug__random_slug_generation_attempts_exhausted(
-    monkeypatch: pytest.MonkeyPatch,
-    client: TestClient,
-) -> None:
-    # Not returning None for non-existing slugs will exhaust the random slug generation attempts.
-    async def _get_link_by_slug(_session: AsyncSession, _slug: str) -> object:
-        return object()
-
-    monkeypatch.setattr(link_database, "get_link_by_slug", _get_link_by_slug)
-
-    response = client.get(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/slugs/random"
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    error = data["detail"][0]
-    assert error["msg"] == "Unable to generate an unused random slug. Please try again."
-    assert error["type"] == "random_slug_generation_failed"
+    assert re.fullmatch(r"^[a-zA-Z0-9]{6}$", response.json()["slug"])

@@ -12,14 +12,14 @@ from fastapi import status
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
-    from fastapi.testclient import TestClient
+    from httpx2 import AsyncClient
 
     from lnkr.models import User
-    from tests.api.conftest import OverrideGetCurrentUserFunction
+    from tests.api.routes.conftest import OverrideGetCurrentUserFunction
 
 
-def test_get_link__slug_does_not_exist(client: TestClient, slug: str) -> None:
-    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}")
+async def test_get_link__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
     data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -30,20 +30,20 @@ def test_get_link__slug_does_not_exist(client: TestClient, slug: str) -> None:
     assert error["type"] == "slug_does_not_exist"
 
 
-def test_get_link__slug_not_owned_by_user(
-    client: TestClient,
+async def test_get_link__slug_not_owned_by_user(
+    client: AsyncClient,
     override_get_current_user: OverrideGetCurrentUserFunction,
     user_other: User,
     slug: str,
     target_url: str,
 ) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
 
     override_get_current_user(user_other)
-    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}")
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
     data = response.json()
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -54,13 +54,13 @@ def test_get_link__slug_not_owned_by_user(
     assert error["type"] == "slug_not_owned_by_user"
 
 
-def test_get_link__success(client: TestClient, slug: str, target_url: str) -> None:
-    client.post(
-        url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}",
+async def test_get_link__slug_owned_by_current_user(client: AsyncClient, slug: str, target_url: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
 
-    response = client.get(url=f"{application_settings.API_VERSION_PREFIX}{application_settings.LINKS_PREFIX}/{slug}")
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
     data = response.json()
 
     assert response.status_code == status.HTTP_200_OK

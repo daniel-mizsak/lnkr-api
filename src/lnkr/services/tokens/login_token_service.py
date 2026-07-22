@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from lnkr.models import IpAddress, LoginTokenCreate, UserAgent
 
 
+LOGIN_TOKEN_LENGTH = 6
+
+
 async def create_and_save_login_token(
     session: AsyncSession,
     login_token_create: LoginTokenCreate,
@@ -76,7 +79,9 @@ async def _create_login_token_without_commit(
 
     # TODO: Check if the login token contains English slur or other inappropriate content.
     for _ in range(maximum_unique_login_token_generation_attempts):
-        login_token_value = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+        login_token_value = "".join(
+            secrets.choice(string.ascii_uppercase + string.digits) for _ in range(LOGIN_TOKEN_LENGTH)
+        )
         token_hash = _hash_token(login_token_value)
 
         try:
