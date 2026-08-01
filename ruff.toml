@@ -28,12 +28,12 @@ indent-width = 4
       "PT001",   # pytest-fixture-incorrect-parentheses-style
       "S101",    # assert
     ]
-    "docs_src/**" = [
-      "D",    # pydocstyle
-      "S106", # hardcoded-password-func-arg
-      "T201", # print
+    "alembic/**" = [
+      "CPY001", # missing-copyright-notice
     ]
   [lint.pydocstyle]
     convention = "google"
   [lint.pylint]
     max-args = 8
+  [lint.flake8-copyright]
+    min-file-size = 1
