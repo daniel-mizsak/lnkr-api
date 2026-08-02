@@ -219,6 +219,30 @@ class UserLinkLimitExceededError(LnkrError):
         )
 
 
+class TimezoneInvalidError(LnkrError):
+    """Raised when an invalid IANA timezone is provided."""
+
+    def __init__(self, timezone: str) -> None:
+        """Initialize with default error message."""
+        msg = f"Timezone '{timezone}' is invalid"
+        super().__init__(msg)
+        self.timezone = timezone
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception."""
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                {
+                    "input": self.timezone,
+                    "loc": ["query", "timezone"],
+                    "msg": str(self),
+                    "type": "timezone_invalid",
+                },
+            ],
+        )
+
+
 class SlugAlreadyExistsError(LnkrError):
     """Raised when a slug already exists in the database."""
 

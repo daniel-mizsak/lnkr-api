@@ -56,6 +56,7 @@ async def test_list_links__trimmed_search_and_single_item_page(
     assert data["has_next"] is False
     assert [item["slug"] for item in data["items"]] == [slug]
     assert [item["target_url"] for item in data["items"]] == [target_url]
+    assert [item["click_count"] for item in data["items"]] == [0]
 
 
 async def test_list_links__query_parameters_and_next_page_metadata(
@@ -75,8 +76,12 @@ async def test_list_links__query_parameters_and_next_page_metadata(
         user=user,
     )
     list_links = mock.AsyncMock(return_value=([link], 5))
+    list_click_counts = mock.AsyncMock(return_value={link.id: 3})
     favorites_only = True
-    with mock.patch.object(link_route, "list_links", list_links):
+    with (
+        mock.patch.object(link_route, "list_links", list_links),
+        mock.patch.object(link_route, "list_click_counts", list_click_counts),
+    ):
         response = await client.get(
             url=f"{application_settings.LINKS_PREFIX}",
             params={
@@ -96,13 +101,31 @@ async def test_list_links__query_parameters_and_next_page_metadata(
     assert data["per_page"] == 2
     assert data["has_next"] is True
     assert [item["slug"] for item in data["items"]] == [slug]
-    list_links.assert_awaited_once_with(
-        mock.ANY,
-        user,
-        "search",
-        favorites_only,
-        "created_at",
-        "ascending",
-        2,
-        2,
-    )
+    assert [item["click_count"] for item in data["items"]] == [3]
+    list_links.assert_awaited_once()
+    list_links_await_args = list_links.await_args
+    assert list_links_await_args is not None
+    (
+        session,
+        requested_user,
+        search,
+        requested_favorites_only,
+        sort,
+        direction,
+        per_page,
+        page,
+    ) = list_links_await_args.args
+    assert requested_user == user
+    assert search == "search"
+    assert requested_favorites_only is favorites_only
+    assert sort == "created_at"
+    assert direction == "ascending"
+    assert per_page == 2
+    assert page == 2
+
+    list_click_counts.assert_awaited_once()
+    list_click_counts_await_args = list_click_counts.await_args
+    assert list_click_counts_await_args is not None
+    click_count_session, requested_links = list_click_counts_await_args.args
+    assert click_count_session is session
+    assert requested_links == [link]
