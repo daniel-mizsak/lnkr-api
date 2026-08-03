@@ -1,7 +1,7 @@
 """
 API endpoints for authentication.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from email.mime.multipart import MIMEMultipart

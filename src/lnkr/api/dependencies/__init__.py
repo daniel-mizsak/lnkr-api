@@ -1,7 +1,7 @@
 """
 FastAPI dependencies.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from lnkr.api.dependencies.auth import get_current_user

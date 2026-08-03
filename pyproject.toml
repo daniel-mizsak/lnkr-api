@@ -13,17 +13,17 @@
   dependencies = [
     "PyJWT==2.13.0",
     "SQLAlchemy[asyncio]==2.0.51",
-    "alembic[tz]==1.18.4",
-    "anyio==4.14.0",
+    "alembic[tz]==1.18.5",
+    "anyio==4.14.2",
     "argon2-cffi==25.1.0",
-    "fastapi[standard]==0.138.0",
-    "geoip2==5.2.0",
-    "httpx2==2.4.0",
+    "fastapi[standard]==0.140.0",
+    "geoip2==5.3.0",
+    "httpx2==2.9.1",
     "psycopg[binary]==3.3.4",
     "pydantic-settings==2.14.2",
     "redis==8.0.1",
     "segno==1.6.6",
-    "sentry-sdk==2.63.0",
+    "sentry-sdk==2.66.1",
     "ua-parser[regex]==1.0.2",
   ]
 
@@ -34,18 +34,18 @@
 [dependency-groups]
   dev = [
     { include-group = "lint" },
-    "ansible-lint==26.4.0",
+    "ansible-lint==26.6.0",
     "beautifulsoup4==4.15.0",
-    "coverage==7.14.3",
-    "fakeredis==2.36.2",
-    "prek==0.4.5",
+    "coverage==7.15.2",
+    "fakeredis==2.37.0",
+    "prek==0.4.11",
     "pytest-asyncio==1.4.0",
     "pytest==9.1.1",
-    "testcontainers[postgres]==4.14.2",
-    "ty==0.0.52",
+    "testcontainers[postgres]==4.15.0",
+    "ty==0.0.63",
   ]
-  lint = ["ruff==0.15.19"]
-  deployment = ["ansible==14.1.0"]
+  lint = ["ruff==0.16.0"]
+  deployment = ["ansible==14.2.0"]
 
 # Tools
 # Pytest

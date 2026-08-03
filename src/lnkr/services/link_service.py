@@ -1,7 +1,7 @@
 """
 High level services for link management.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import contextlib

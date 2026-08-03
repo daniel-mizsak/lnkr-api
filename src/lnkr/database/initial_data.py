@@ -1,7 +1,7 @@
 """
 Initial development data for the database.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings

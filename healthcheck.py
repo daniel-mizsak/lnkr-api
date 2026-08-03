@@ -1,7 +1,7 @@
 """
 Health check script for the docker image.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import sys

@@ -1,7 +1,7 @@
 """
 Database configurations.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from pydantic import SecretStr  # noqa: TC002
@@ -20,4 +20,4 @@ class DatabaseSettings(BaseSettings):
     POSTGRES_DATABASE: str
 
 
-database_settings = DatabaseSettings()  # ty:ignore[missing-argument]
+database_settings = DatabaseSettings()

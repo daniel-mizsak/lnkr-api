@@ -1,7 +1,7 @@
 """
 Fixtures used in testing API routes.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from collections.abc import AsyncIterator, Callable, Generator
