@@ -1,7 +1,7 @@
 """
 Data schemas for header management.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from pydantic import BaseModel

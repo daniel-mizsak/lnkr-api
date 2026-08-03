@@ -1,7 +1,7 @@
 """
 Shared model constraints.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 # 45 is the length of IPv4-mapped IPv6 addresses.

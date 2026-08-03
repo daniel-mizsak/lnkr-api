@@ -1,7 +1,7 @@
 """
 Application configurations.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from enum import StrEnum
@@ -74,4 +74,4 @@ class ApplicationSettings(BaseSettings):
     GEOIP_COUNTRY_DATABASE_PATH: str = "geoip/GeoLite2-Country.mmdb"
 
 
-application_settings = ApplicationSettings()  # ty:ignore[missing-argument]
+application_settings = ApplicationSettings()

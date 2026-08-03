@@ -1,7 +1,7 @@
 """
 FastAPI dependencies for pagination parameters.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from typing import Annotated

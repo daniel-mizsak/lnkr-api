@@ -1,7 +1,7 @@
 """
 Tests for refresh token database operations.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import uuid

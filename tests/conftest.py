@@ -1,7 +1,7 @@
 """
 General fixtures.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import ipaddress
@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from geoip2.errors import AddressNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.postgres import PostgresContainer
 
 from lnkr.config.application_settings import application_settings
 from lnkr.models import Link, LinkCache, LinkStatus, User

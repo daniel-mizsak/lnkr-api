@@ -1,7 +1,7 @@
 """
 SQLAlchemy base database model.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from sqlalchemy.orm import DeclarativeBase

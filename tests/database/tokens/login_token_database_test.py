@@ -1,7 +1,7 @@
 """
 Tests for login token database operations.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from datetime import UTC, datetime, timedelta

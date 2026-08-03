@@ -5,7 +5,7 @@ These tests ensure that changes to the default configurations will break the tes
 Otherwise, (since the api tests are using references to the default values) the tests
 will pass in case of an accidental change.
 
-@author "Daniel Mizsak" <daniel@mizsak.com>
+Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
