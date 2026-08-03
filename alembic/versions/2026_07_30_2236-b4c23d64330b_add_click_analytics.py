@@ -1,0 +1,68 @@
+"""add_click_analytics.
+
+Revision ID: b4c23d64330b
+Revises: c73e9ec5e9b7
+Create Date: 2026-07-30 22:36:06.363383+00:00
+
+"""
+
+from typing import TYPE_CHECKING
+
+from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+# revision identifiers, used by Alembic.
+revision: str = "b4c23d64330b"
+down_revision: str | Sequence[str] | None = "c73e9ec5e9b7"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    with op.get_context().autocommit_block():
+        op.create_index(
+            "ix_clicks_link_id_source_timestamp",
+            "clicks",
+            ["link_id", "source", "timestamp"],
+            unique=False,
+            postgresql_include=("country_code",),
+            postgresql_concurrently=True,
+        )
+        op.create_index(
+            "ix_clicks_link_id_timestamp_id",
+            "clicks",
+            ["link_id", "timestamp", "id"],
+            unique=False,
+            postgresql_concurrently=True,
+        )
+        op.drop_index(
+            op.f("ix_clicks_link_id"),
+            table_name="clicks",
+            postgresql_concurrently=True,
+        )
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    with op.get_context().autocommit_block():
+        op.create_index(
+            op.f("ix_clicks_link_id"),
+            "clicks",
+            ["link_id"],
+            unique=False,
+            postgresql_concurrently=True,
+        )
+        op.drop_index(
+            "ix_clicks_link_id_timestamp_id",
+            table_name="clicks",
+            postgresql_concurrently=True,
+        )
+        op.drop_index(
+            "ix_clicks_link_id_source_timestamp",
+            table_name="clicks",
+            postgresql_concurrently=True,
+        )

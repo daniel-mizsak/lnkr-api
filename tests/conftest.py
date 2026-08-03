@@ -111,6 +111,19 @@ def link_fixture(user: User, slug: str, target_url: str) -> Link:
     )
 
 
+@pytest.fixture(name="link_other")
+def link_other_fixture(user: User, slug_other: str, target_url: str) -> Link:
+    return Link(
+        id=uuid.uuid4(),
+        slug=slug_other,
+        target_url=target_url,
+        status=LinkStatus.ACTIVE,
+        favorite=False,
+        user=user,
+        user_id=user.id,
+    )
+
+
 @pytest.fixture(name="cached_link")
 def cached_link_fixture(link: Link) -> LinkCache:
     return LinkCache.from_link(link)

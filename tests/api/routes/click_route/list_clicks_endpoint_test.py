@@ -104,8 +104,16 @@ async def test_list_clicks__recorded_click_metadata(
     assert data["next_cursor"] is None
     assert len(data["items"]) == 1
     click = data["items"][0]
-    assert set(click) == {"timestamp", "ip_address", "country_code", "browser", "operating_system"}
+    assert set(click) == {
+        "timestamp",
+        "source",
+        "ip_address",
+        "country_code",
+        "browser",
+        "operating_system",
+    }
     assert before <= datetime.fromisoformat(click["timestamp"]) <= before + timedelta(seconds=1)
+    assert click["source"] == "lnkr_app"
     assert click["ip_address"] == ip_address_public
     assert click["country_code"] == ip_address_public_country_code
     assert click["browser"] == "Chrome"

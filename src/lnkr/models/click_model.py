@@ -6,12 +6,14 @@ Data schemas and database models for click management.
 
 import base64
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
-from pydantic import AwareDatetime, BaseModel
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid
+from pydantic import AwareDatetime, BaseModel, Field
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lnkr.models.base import Base
@@ -47,6 +49,7 @@ class ClickRead(BaseModel):
     """Click schema for reading a click."""
 
     timestamp: datetime
+    source: ClickSource
     ip_address: str | None
     country_code: str | None
     browser: str | None
@@ -57,6 +60,7 @@ class ClickRead(BaseModel):
         """Create a ClickRead instance from a Click instance."""
         return cls(
             timestamp=click.timestamp,
+            source=click.source,
             ip_address=click.ip_address,
             country_code=click.country_code,
             browser=click.browser,
@@ -90,6 +94,23 @@ class Click(Base):
     """Click model saved in the database."""
 
     __tablename__ = "clicks"
+    __table_args__ = (
+        # Lists a link's clicks in timestamp/id order with efficient cursor pagination.
+        Index(
+            "ix_clicks_link_id_timestamp_id",
+            "link_id",
+            "timestamp",
+            "id",
+        ),
+        # Filters analytics by link, source, and time; includes country_code for index-only country counts.
+        Index(
+            "ix_clicks_link_id_source_timestamp",
+            "link_id",
+            "source",
+            "timestamp",
+            postgresql_include=("country_code",),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(
@@ -107,7 +128,6 @@ class Click(Base):
     link_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey("links.id", ondelete="CASCADE"),
-        index=True,
         nullable=False,
     )
     link: Mapped[Link] = relationship(back_populates="clicks")
@@ -123,3 +143,73 @@ class Click(Base):
             operating_system=click_create.operating_system,
             link_id=link_id,
         )
+
+
+# Analytics
+class ClickAnalyticsRead(BaseModel):
+    """Click analytics dashboard data."""
+
+    summary: ClickAnalyticsSummaryRead
+    daily_clicks: ClickAnalyticsDailyClicksRead
+    top_countries: ClickAnalyticsTopCountriesRead
+
+
+class ClickAnalyticsSummaryRead(BaseModel):
+    """Click summary statistics."""
+
+    total_clicks: int = Field(ge=0)
+    last_7_days_clicks: int = Field(ge=0)
+
+
+class ClickAnalyticsDailyClicksRead(BaseModel):
+    """Daily click counts and the effective period used to calculate them."""
+
+    period: ClickAnalyticsPeriodRead
+    days: list[ClickAnalyticsDailyCountRead]
+
+
+class ClickAnalyticsTopCountriesRead(BaseModel):
+    """Top countries and the effective period used to calculate them."""
+
+    period: ClickAnalyticsPeriodRead
+    known_country_click_count: int = Field(ge=0)
+    countries: list[ClickAnalyticsCountryCountRead]
+
+
+class ClickAnalyticsPeriodRead(BaseModel):
+    """Effective local-date range represented by an analytics response section."""
+
+    from_date: date
+    through_date: date
+    timezone: str
+
+    def to_time_range(self) -> ClickAnalyticsTimeRange:
+        """Convert the local-date period to a half-open UTC time range."""
+        timezone = ZoneInfo(self.timezone)
+        return ClickAnalyticsTimeRange(
+            start=datetime.combine(self.from_date, time.min, tzinfo=timezone).astimezone(UTC),
+            end=datetime.combine(self.through_date + timedelta(days=1), time.min, tzinfo=timezone).astimezone(UTC),
+        )
+
+
+class ClickAnalyticsDailyCountRead(BaseModel):
+    """Number of clicks recorded on a calendar day."""
+
+    date: date
+    clicks: int = Field(ge=0)
+
+
+class ClickAnalyticsCountryCountRead(BaseModel):
+    """Click count and share of clicks with a known country."""
+
+    country_code: str
+    clicks: int = Field(ge=0)
+    percentage: float = Field(ge=0, le=100)
+
+
+@dataclass(frozen=True)
+class ClickAnalyticsTimeRange:
+    """Datetime range used by click analytics queries."""
+
+    start: datetime
+    end: datetime
