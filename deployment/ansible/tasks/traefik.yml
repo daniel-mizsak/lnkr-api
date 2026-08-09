@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/tasks.json
 ---
 - name: Create traefik directory
   ansible.builtin.file:
@@ -44,6 +45,7 @@
     redis_username: "{{ lookup('env', 'REDIS_USERNAME') }}"
     redis_password: "{{ lookup('env', 'REDIS_PASSWORD') }}"
     redis_database_traefik: "{{ lookup('env', 'REDIS_DATABASE_TRAEFIK') }}"
+  no_log: true
 
 - name: Create traefik network
   community.docker.docker_network:

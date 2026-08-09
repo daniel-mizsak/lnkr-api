@@ -1,0 +1,73 @@
+---
+- name: Install backup dependencies
+  ansible.builtin.apt:
+    package:
+      - age
+      - ca-certificates
+      - cron
+      - curl
+      - logrotate
+      - rclone
+    state: present
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: /deploy/applications/{{ application_name }}/backups
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0700"
+    state: directory
+
+- name: Create database backup log file
+  ansible.builtin.file:
+    path: /deploy/applications/{{ application_name }}/logs/database-backup.log
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0640"
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+
+- name: Configure database backup log rotation
+  ansible.builtin.template:
+    src: backup/logrotate.j2
+    dest: /etc/logrotate.d/{{ application_name }}-backup
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create rclone configuration directory
+  ansible.builtin.file:
+    path: /home/{{ application_user_name }}/.config/rclone
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0700"
+    state: directory
+
+- name: Add rclone configuration
+  ansible.builtin.template:
+    src: backup/rclone.conf.j2
+    dest: /home/{{ application_user_name }}/.config/rclone/rclone.conf
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0600"
+  no_log: true
+
+- name: Add database backup script
+  ansible.builtin.template:
+    src: backup/database-backup.sh.j2
+    dest: /usr/local/bin/database-backup.sh
+    owner: root
+    group: root
+    mode: "0755"
+  no_log: true
+
+- name: Schedule daily postgres backup
+  ansible.builtin.cron:
+    name: "postgres backup"
+    minute: "0"
+    hour: "2"
+    user: "{{ application_user_name }}"
+    job: >-
+      /usr/local/bin/database-backup.sh
+      >> /deploy/applications/{{ application_name }}/logs/database-backup.log 2>&1

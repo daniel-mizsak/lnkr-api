@@ -45,7 +45,11 @@
     "ty==0.0.63",
   ]
   lint = ["ruff==0.16.0"]
-  deployment = ["ansible==14.2.0"]
+  deployment = [
+    "ansible==14.2.0",
+    "pulumi==3.254.0",
+    "pulumi-cloudflare==6.18.0",
+  ]
 
 # Tools
 # Pytest

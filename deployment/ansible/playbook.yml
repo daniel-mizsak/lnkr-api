@@ -6,12 +6,8 @@
   vars:
     application_name: "lnkr-api"
     application_user_name: "ansible"
-
-  handlers:
-    - name: Restart docker
-      ansible.builtin.service:
-        name: docker
-        state: restarted
+    rclone_remote_name: "r2"
+    cloudflare_bucket_name: "{{ application_name }}" # Must match the bucket name used in pulumi's __main__.py
 
   pre_tasks:
     - name: Verify required environment variables are set
@@ -25,10 +21,12 @@
         - FRONTEND_API_KEY
         - SENTRY_DSN
         - POSTGRES_HOST
+        - POSTGRES_IMAGE
         - POSTGRES_PORT
         - POSTGRES_PASSWORD
         - POSTGRES_PASSWORD_ROOT
         - REDIS_HOST
+        - REDIS_IMAGE
         - REDIS_PORT
         - REDIS_USERNAME
         - REDIS_PASSWORD
@@ -40,6 +38,11 @@
         - SMTP_PASSWORD
         - GEOIP_ACCOUNT_ID
         - GEOIP_LICENSE_KEY
+        - CLOUDFLARE_ACCOUNT_ID
+        - CLOUDFLARE_ACCESS_KEY_ID
+        - CLOUDFLARE_SECRET_ACCESS_KEY
+        - AGE_PUBLIC_KEY
+        - HEALTHCHECKS_DATABASE_BACKUP_UUID
 
     - name: Update apt package cache
       ansible.builtin.apt:
@@ -71,6 +74,14 @@
         mode: "0755"
         state: directory
 
+    - name: Create lnkr log directory
+      ansible.builtin.file:
+        path: /deploy/applications/{{ application_name }}/logs
+        owner: "{{ application_user_name }}"
+        group: "{{ application_user_name }}"
+        mode: "0750"
+        state: directory
+
     - name: Import docker tasks
       ansible.builtin.import_tasks:
         file: tasks/docker.yml
@@ -90,6 +101,10 @@
     - name: Import geoip tasks
       ansible.builtin.import_tasks:
         file: tasks/geoip.yml
+
+    - name: Import backup tasks
+      ansible.builtin.import_tasks:
+        file: tasks/backup.yml
 
     - name: Import lnkr tasks
       ansible.builtin.import_tasks:

@@ -23,5 +23,6 @@ BASH_SHFMT_ARGUMENTS: --indent=4 --space-redirects
 MARKDOWN_MARKDOWNLINT_FILTER_REGEX_EXCLUDE: (^\.github/PULL_REQUEST_TEMPLATE\.md$)
 REPOSITORY_CHECKOV_CONFIG_FILE: .github/linters/.checkov.yml
 REPOSITORY_TRIVY_ARGUMENTS: --ignorefile .github/linters/.trivyignore.yaml
+REPOSITORY_TRUFFLEHOG_ARGUMENTS: --exclude-detectors=Lob # Lob API key pattern collides with pytest function names.
 YAML_V8R_CONFIG_FILE: .github/linters/.v8rrc.yml
 YAML_YAMLLINT_ARGUMENTS: --strict

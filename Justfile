@@ -104,6 +104,16 @@ deploy-development up="up":
     {{ if up == "up" { " --build --watch" } else { "" } }} \
     {{ if up == "down" { " --volumes" } else { "" } }}
 
+[group("deploy")]
+[working-directory("./deployment/pulumi")]
+pulumi-stack-init:
+    uv run pulumi stack init Production
+
+[group("deploy")]
+[working-directory("./deployment/pulumi")]
+pulumi arg:
+    op run --env-file="../.env.production" --no-masking -- uv run pulumi {{ arg }}
+
 [confirm("Deploy to production? (y/N)")]
 [group("deploy")]
 [working-directory("./deployment/ansible")]

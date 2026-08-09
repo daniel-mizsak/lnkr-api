@@ -33,3 +33,4 @@
   environment:
     REDIS_IMAGE: "{{ lookup('env', 'REDIS_IMAGE') }}"
     REDIS_PASSWORD: "{{ lookup('env', 'REDIS_PASSWORD') }}"
+  no_log: true
