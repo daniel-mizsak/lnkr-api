@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+umask 077
+
+LOCAL_RETENTION_DAYS=14
+
+BACKUP_DIRECTORY="/deploy/applications/{{ application_name }}/backups"
+APPLICATION_DATABASE_NAME="{{ application_name }}"
+R2_BACKUP_REMOTE="{{ rclone_remote_name }}:{{ cloudflare_bucket_name }}"
+AGE_PUBLIC_KEY="{{ lookup('env', 'AGE_PUBLIC_KEY') }}"
+TIMESTAMP="$(date --utc +%Y-%m-%dT%H-%M-%SZ)"
+
+PING_URL="https://hc-ping.com/{{ lookup('env', 'HEALTHCHECKS_DATABASE_BACKUP_UUID') }}"
+APPLICATION_DATABASE_DUMP_FILE=""
+APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE=""
+
+cleanup() {
+    local exit_code=$?
+    if [[ -n "${APPLICATION_DATABASE_DUMP_FILE}" ]]; then
+        rm -f "${APPLICATION_DATABASE_DUMP_FILE}.tmp"
+    fi
+    if [[ -n "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}" ]]; then
+        rm -f \
+            "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}" \
+            "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}.tmp"
+    fi
+    echo "Database backup finished with exit code ${exit_code} at $(date --utc +%Y-%m-%dT%H:%M:%S) UTC"
+    curl --fail --silent --show-error --max-time 10 --retry 3 --output /dev/null "${PING_URL}/${exit_code}" || true
+}
+trap cleanup EXIT
+
+echo "Database backup started at $(date --utc +%Y-%m-%dT%H:%M:%S) UTC"
+curl --fail --silent --show-error --max-time 10 --retry 3 --output /dev/null "${PING_URL}/start" || true
+
+# Do not let multiple runs overlap.
+# https://man7.org/linux/man-pages/man1/flock.1.html
+exec 4<> "${BACKUP_DIRECTORY}/.database-backup.lock"
+if ! flock --nonblock 4; then
+    echo "Error: another database backup is already running." >&2
+    exit 1
+fi
+
+# Prune old local dumps.
+find "${BACKUP_DIRECTORY}" -maxdepth 1 -type f \
+    -name "${APPLICATION_DATABASE_NAME}_*.dump" \
+    -mtime "+${LOCAL_RETENTION_DAYS}" \
+    -delete
+echo "Pruned local application database dumps older than ${LOCAL_RETENTION_DAYS} days"
+
+find "${BACKUP_DIRECTORY}" -maxdepth 1 -type f -name "*.tmp" -delete
+
+APPLICATION_DATABASE_DUMP_FILE="${BACKUP_DIRECTORY}/${APPLICATION_DATABASE_NAME}_${TIMESTAMP}.dump"
+APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE="${APPLICATION_DATABASE_DUMP_FILE}.age"
+
+# Create the application database backup.
+docker exec postgres pg_dump \
+    --username=postgres \
+    --dbname="${APPLICATION_DATABASE_NAME}" \
+    --format=custom \
+    --compress=6 > "${APPLICATION_DATABASE_DUMP_FILE}.tmp"
+mv "${APPLICATION_DATABASE_DUMP_FILE}.tmp" "${APPLICATION_DATABASE_DUMP_FILE}"
+echo "Created application database dump: ${APPLICATION_DATABASE_DUMP_FILE}"
+
+# Encrypt data.
+age --encrypt \
+    --recipient "${AGE_PUBLIC_KEY}" \
+    --output "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}.tmp" \
+    "${APPLICATION_DATABASE_DUMP_FILE}"
+mv "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}.tmp" "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}"
+echo "Encrypted application database dump: ${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}"
+
+# Upload to Cloudflare R2.
+rclone copyto --immutable \
+    "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}" \
+    "${R2_BACKUP_REMOTE}/application-database/$(basename "${APPLICATION_DATABASE_ENCRYPTED_DUMP_FILE}")"
+echo "Uploaded encrypted application database dump to ${R2_BACKUP_REMOTE}"

@@ -1,0 +1,10 @@
+/deploy/applications/{{ application_name }}/logs/geoip-database-update.log {
+    weekly
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ application_user_name }} {{ application_user_name }}
+    su {{ application_user_name }} {{ application_user_name }}
+}

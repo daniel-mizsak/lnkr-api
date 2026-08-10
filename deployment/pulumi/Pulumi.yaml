@@ -1,0 +1,5 @@
+---
+name: lnkr-api
+description: Cloudflare R2 bucket for lnkr-api backups.
+runtime:
+  name: python

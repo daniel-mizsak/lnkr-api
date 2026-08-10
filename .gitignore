@@ -1,6 +1,6 @@
 # Project
 deployment/ansible/inventory.ini
-geoip
+/geoip
 
 # System
 .DS_Store

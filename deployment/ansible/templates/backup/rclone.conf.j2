@@ -1,0 +1,7 @@
+[{{ rclone_remote_name }}]
+type = s3
+provider = Cloudflare
+access_key_id = {{ lookup('env', 'CLOUDFLARE_ACCESS_KEY_ID') }}
+secret_access_key = {{ lookup('env', 'CLOUDFLARE_SECRET_ACCESS_KEY') }}
+endpoint = https://{{ lookup('env', 'CLOUDFLARE_ACCOUNT_ID') }}.r2.cloudflarestorage.com
+acl = private

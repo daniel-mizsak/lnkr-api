@@ -7,7 +7,19 @@ set -euo pipefail
 
 GEOIP_DATABASE_EDITION="GeoLite2-Country"
 GEOIP_DATABASE_DIRECTORY="geoip"
+GEOIP_DATABASE_FILE="${GEOIP_DATABASE_DIRECTORY}/${GEOIP_DATABASE_EDITION}.mmdb"
+temporary_directory=""
 
+cleanup() {
+    local exit_code=$?
+    if [[ -n "${temporary_directory}" ]]; then
+        rm -rf "${temporary_directory}"
+    fi
+    echo "GeoIP database update finished with exit code ${exit_code} at $(date -u +%Y-%m-%dT%H:%M:%S) UTC"
+}
+trap cleanup EXIT
+
+echo "GeoIP database update started at $(date -u +%Y-%m-%dT%H:%M:%S) UTC"
 if [[ -n "${GEOIP_CREDENTIALS:-}" ]]; then
     if [[ ! -f "${GEOIP_CREDENTIALS}" ]]; then
         echo "Error: GEOIP_CREDENTIALS is set to '${GEOIP_CREDENTIALS}', but that file does not exist." >&2
@@ -29,8 +41,7 @@ if [[ -z "${GEOIP_LICENSE_KEY:-}" ]]; then
 fi
 
 mkdir -p "${GEOIP_DATABASE_DIRECTORY}"
-temporary_directory="$(mktemp --directory)"
-trap 'rm -rf "${temporary_directory}"' EXIT
+temporary_directory="$(mktemp --directory "${GEOIP_DATABASE_DIRECTORY}/.update.XXXXXX")"
 
 curl --fail --silent --show-error --location \
     --connect-timeout 10 --max-time 300 \
@@ -39,8 +50,5 @@ curl --fail --silent --show-error --location \
     "https://download.maxmind.com/geoip/databases/${GEOIP_DATABASE_EDITION}/download?suffix=tar.gz" |
     tar --extract --gzip --strip-components=1 --directory "${temporary_directory}"
 
-# Stage inside the target directory first, then rename so readers never observe a partial file.
-mv "${temporary_directory}/${GEOIP_DATABASE_EDITION}.mmdb" "${GEOIP_DATABASE_DIRECTORY}/${GEOIP_DATABASE_EDITION}.mmdb.tmp"
-mv "${GEOIP_DATABASE_DIRECTORY}/${GEOIP_DATABASE_EDITION}.mmdb.tmp" "${GEOIP_DATABASE_DIRECTORY}/${GEOIP_DATABASE_EDITION}.mmdb"
-
-echo "Updated ${GEOIP_DATABASE_DIRECTORY}/${GEOIP_DATABASE_EDITION}.mmdb"
+mv "${temporary_directory}/${GEOIP_DATABASE_EDITION}.mmdb" "${GEOIP_DATABASE_FILE}"
+echo "Updated ${GEOIP_DATABASE_FILE}"

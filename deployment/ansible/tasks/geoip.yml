@@ -1,4 +1,13 @@
 ---
+- name: Install geoip update packages
+  ansible.builtin.apt:
+    package:
+      - ca-certificates
+      - cron
+      - curl
+      - logrotate
+    state: present
+
 - name: Create geoip directory
   ansible.builtin.file:
     path: /deploy/applications/{{ application_name }}/geoip
@@ -7,13 +16,31 @@
     mode: "0755"
     state: directory
 
+- name: Create geoip update log file
+  ansible.builtin.file:
+    path: /deploy/applications/{{ application_name }}/logs/geoip-database-update.log
+    owner: "{{ application_user_name }}"
+    group: "{{ application_user_name }}"
+    mode: "0640"
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+
+- name: Configure geoip database update log rotation
+  ansible.builtin.template:
+    src: geoip/logrotate.j2
+    dest: /etc/logrotate.d/{{ application_name }}-geoip
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Add geoip database update script
   ansible.builtin.copy:
     src: ./../../scripts/update-geoip-database.sh
     dest: /usr/local/bin/update-geoip-database.sh
     owner: root
-    group: root
-    mode: "0755"
+    group: "{{ application_user_name }}"
+    mode: "0750"
 
 - name: Create geoip credentials directory
   ansible.builtin.file:
@@ -51,7 +78,8 @@
     hour: "3"
     minute: "0"
     user: "{{ application_user_name }}"
-    job: >
+    job: >-
       cd /deploy/applications/{{ application_name }} &&
       GEOIP_CREDENTIALS=/home/{{ application_user_name }}/.config/geoip/credentials.env
       /usr/local/bin/update-geoip-database.sh
+      >> /deploy/applications/{{ application_name }}/logs/geoip-database-update.log 2>&1

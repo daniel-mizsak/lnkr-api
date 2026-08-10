@@ -16,6 +16,8 @@ Link manager REST API.
 
 ### Technology Stack and Features
 
+#### Application
+
 - [FastAPI](https://fastapi.tiangolo.com) for the Python backend API.
 - [Pydantic](https://docs.pydantic.dev) for the data validation and configuration management.
 - [PostgreSQL](https://www.postgresql.org) as the SQL database.
@@ -23,14 +25,21 @@ Link manager REST API.
 - [Alembic](https://alembic.sqlalchemy.org) for database migrations.
 - [Redis](https://redis.io) for caching.
 - [GeoLite2](https://www.maxmind.com) for IP-based geolocation.
-- [Pytest](https://pytest.org) for testing.
-- [Docker Compose](https://www.docker.com) for development and production.
 - [Resend](https://resend.com)'s SMTP for passwordless email-based registration.
 - [JWT](https://www.jwt.io) (JSON Web Token) for endpoint authentication.
-- [Traefik](https://traefik.io) for reverse proxy and rate limiting.
-- [GitHub Actions](https://docs.github.com/en/actions) for CI/CD.
+- [Pytest](https://pytest.org) for testing.
+
+#### CI/CD and Deployment
+
 - [Just](https://just.systems) as the command runner.
+- [Docker Compose](https://www.docker.com) for development and production.
+- [GitHub Actions](https://docs.github.com/en/actions) for CI/CD.
+- [Traefik](https://traefik.io) for reverse proxy and rate limiting.
+- [Ansible](https://www.ansible.com) for provisioning and configuration management.
+- [Pulumi](https://www.pulumi.com) for infrastructure as code.
 - [1Password](https://1password.com) for secrets management.
+- [Age](https://age-encryption.org) and [Rclone](https://rclone.org) for encrypted backups.
+- [Healthchecks](https://healthchecks.io) for monitoring successful runs of scheduled tasks.
 
 ### Development
 
@@ -51,6 +60,23 @@ Run the application locally using Docker Compose:
 
 ```bash
 just deploy-development
+```
+
+### Production
+
+Production runs on an Ubuntu VPS provisioned and hardened with [vps-setup](https://github.com/mlops-top/vps-setup).
+
+Create R2 bucket for backups:
+
+```bash
+just pulumi-stack-init
+just pulumi up
+```
+
+Deploy to production:
+
+```bash
+just deploy-production
 ```
 
 ### Future improvements

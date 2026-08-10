@@ -76,7 +76,7 @@ repos:
       # ty
       - id: ty
         name: ty check
-        entry: uv run --locked ty check
+        entry: uv run --locked --all-groups ty check
         language: system
         pass_filenames: false
         always_run: true

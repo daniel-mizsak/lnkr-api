@@ -39,6 +39,7 @@
   environment:
     POSTGRES_IMAGE: "{{ lookup('env', 'POSTGRES_IMAGE') }}"
     POSTGRES_PASSWORD_ROOT: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
+  no_log: true
 
 - name: Create postgres application user
   community.postgresql.postgresql_user:
@@ -49,6 +50,7 @@
     login_user: "postgres"
     login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
     state: present
+  no_log: true
 
 - name: Create postgres application database
   community.postgresql.postgresql_db:
@@ -59,19 +61,4 @@
     login_user: "postgres"
     login_password: "{{ lookup('env', 'POSTGRES_PASSWORD_ROOT') }}"
     state: present
-
-- name: Add database backup script
-  ansible.builtin.template:
-    src: postgres/database-backup.sh.j2
-    dest: /usr/local/bin/database-backup.sh
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Schedule daily postgres backup
-  ansible.builtin.cron:
-    name: "postgres backup"
-    minute: "0"
-    hour: "2"
-    user: "{{ application_user_name }}"
-    job: /usr/local/bin/database-backup.sh
+  no_log: true
