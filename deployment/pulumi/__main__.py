@@ -11,6 +11,7 @@ import pulumi_cloudflare as cloudflare
 
 BACKUP_PREFIX = "application-database/"
 LOCK_SECONDS = 30 * 24 * 60 * 60
+MULTIPART_UPLOAD_ABORT_SECONDS = 7 * 24 * 60 * 60
 RETENTION_SECONDS = 90 * 24 * 60 * 60
 
 r2_bucket_lnkr_api_backup = cloudflare.R2Bucket(
@@ -50,6 +51,12 @@ r2_bucket_lnkr_api_backup_lifecycle = cloudflare.R2BucketLifecycle(
         {
             "id": f"delete-{BACKUP_PREFIX.rstrip('/')}-after-90-days",
             "conditions": {"prefix": BACKUP_PREFIX},
+            "abort_multipart_uploads_transition": {
+                "condition": {
+                    "max_age": MULTIPART_UPLOAD_ABORT_SECONDS,
+                    "type": "Age",
+                },
+            },
             "delete_objects_transition": {
                 "condition": {
                     "max_age": RETENTION_SECONDS,

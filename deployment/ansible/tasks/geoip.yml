@@ -39,8 +39,8 @@
     src: ./../../scripts/update-geoip-database.sh
     dest: /usr/local/bin/update-geoip-database.sh
     owner: root
-    group: root
-    mode: "0755"
+    group: "{{ application_user_name }}"
+    mode: "0750"
 
 - name: Create geoip credentials directory
   ansible.builtin.file:
