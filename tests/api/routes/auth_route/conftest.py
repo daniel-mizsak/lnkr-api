@@ -42,9 +42,9 @@ async def issued_login_token_fixture(client: AsyncClient, mock_send_email: mock.
 
     email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
     soup = BeautifulSoup(email_body, "html.parser")
-    login_token_span = soup.find("span", class_="login-token")
-    assert login_token_span is not None
-    return login_token_span.get_text().strip()
+    login_token_element = soup.find(class_="login-token")
+    assert login_token_element is not None
+    return login_token_element.get_text()
 
 
 @pytest.fixture(name="issued_auth_tokens")
