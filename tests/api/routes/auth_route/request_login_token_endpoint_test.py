@@ -76,9 +76,11 @@ async def test_request_login_token__missing_request_metadata(
     email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
     soup = BeautifulSoup(email_body, "html.parser")
 
-    assert _get_text_by_class(soup, "request-ip-address") == "Unavailable"
-    assert _get_text_by_class(soup, "request-country-code") == "Unavailable"
-    assert _get_text_by_class(soup, "request-user-agent") == "Unavailable"
+    assert _get_text_by_class(soup, "request-ip-address") == "IP Not Found"
+    assert _get_text_by_class(soup, "request-country-code") == "Country Not Found"
+    assert soup.find(class_="request-country-flag") is None
+    assert _get_text_by_class(soup, "request-operating-system") == "OS Not Found"
+    assert _get_text_by_class(soup, "request-browser") == "Browser Not Found"
 
 
 async def test_request_login_token__complete_request_metadata(
@@ -104,15 +106,19 @@ async def test_request_login_token__complete_request_metadata(
 
     assert sent_email["To"] == email
     assert sent_email["From"] == application_settings.FROM_EMAIL
-    assert sent_email["Subject"] == "Email Verification - lnkr"
+    assert sent_email["Subject"] == "Sign in to lnkr.by"
 
     email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
     soup = BeautifulSoup(email_body, "html.parser")
-    login_token_value = _get_text_by_class(soup, "login-token")
+    login_token_element = soup.find(class_="login-token")
+    assert login_token_element is not None
+    login_token_value = login_token_element.get_text()
     assert len(login_token_value) == 6
     assert _get_text_by_class(soup, "request-ip-address") == ip_address_public
     assert _get_text_by_class(soup, "request-country-code") == ip_address_public_country_code
-    assert _get_text_by_class(soup, "request-user-agent") == "Chrome on Mac OS X"
+    assert _get_text_by_class(soup, "request-country-flag") == "🇺🇸"
+    assert _get_text_by_class(soup, "request-operating-system") == "Mac OS X"
+    assert _get_text_by_class(soup, "request-browser") == "Chrome"
 
     result = await session.execute(select(LoginToken))
     login_token = result.scalar_one()

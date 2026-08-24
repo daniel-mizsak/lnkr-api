@@ -29,7 +29,7 @@ from lnkr.models import (
     UserCreate,
 )
 from lnkr.services.email_service import send_email
-from lnkr.services.geoip_service import get_country_code_from_ip
+from lnkr.services.geoip_service import get_country_code_from_ip, get_country_flag_from_country_code
 from lnkr.services.tokens.access_token_service import create_access_token
 from lnkr.services.tokens.login_token_service import consume_login_token, create_and_save_login_token
 from lnkr.services.tokens.refresh_token_service import (
@@ -150,13 +150,14 @@ def _create_login_token_email(
     message = MIMEMultipart()
     message["From"] = application_settings.FROM_EMAIL
     message["To"] = to_address
-    message["Subject"] = "Email Verification - lnkr"
+    message["Subject"] = "Sign in to lnkr.by"
 
     message_body = email_templates.get_template("login_token.html.j2").render(
         expiry_time=application_settings.LOGIN_TOKEN_EXPIRE_MINUTES,
         token=token,
         ip_address=ip_address.ip_address,
         country_code=country_code,
+        country_flag=get_country_flag_from_country_code(country_code),
         user_agent=user_agent,
         # TODO: Add callback URL to request login token endpoint and attach to login_url.
         # TODO: Use urllib.parse.quote to encode the token value in the URL.

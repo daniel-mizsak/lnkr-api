@@ -6,7 +6,9 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 
 from typing import TYPE_CHECKING
 
-from lnkr.services.geoip_service import get_country_code_from_ip
+import pytest
+
+from lnkr.services.geoip_service import get_country_code_from_ip, get_country_flag_from_country_code
 
 if TYPE_CHECKING:
     from geoip2.database import Reader
@@ -35,3 +37,20 @@ def test_get_country_code_from_ip__none(geoip_reader: Reader) -> None:
 
 def test_get_country_code_from_ip__empty_string(geoip_reader: Reader) -> None:
     assert get_country_code_from_ip(geoip_reader, "") is None
+
+
+@pytest.mark.parametrize(
+    ("country_code", "country_flag"),
+    [
+        ("US", "🇺🇸"),
+        ("dk", "🇩🇰"),
+        ("ZZ", "🇿🇿"),  # Valid format, but no assigned Unicode flag.
+        (None, None),
+        ("", None),
+        ("USA", None),
+        ("1A", None),
+        ("ÆØ", None),
+    ],
+)
+def test_get_country_flag_from_country_code(country_code: str | None, country_flag: str | None) -> None:
+    assert get_country_flag_from_country_code(country_code) == country_flag

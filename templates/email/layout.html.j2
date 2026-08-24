@@ -3,21 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="x-apple-disable-message-reformatting" />
     <meta
       name="format-detection"
       content="telephone=no,address=no,email=no,date=no,url=no"
     />
-    <meta name="color-scheme" content="light dark" />
-    <title>{% block title %}lnkr{% endblock %}</title>
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
+    <style>
+      :root {
+        color-scheme: dark;
+        supported-color-schemes: dark;
+      }
+
+      @media only screen and (max-width: 600px) {
+        .page-padding {
+          padding: 32px 16px !important;
+        }
+
+        .email-card {
+          padding: 28px 24px !important;
+        }
+
+        .details-column {
+          display: block !important;
+          width: 100% !important;
+        }
+
+        .details-spacer + .details-column {
+          padding-top: 14px !important;
+        }
+
+        .details-spacer {
+          display: none !important;
+        }
+
+        .safety-separator {
+          display: none !important;
+        }
+
+        .safety-copy {
+          display: block !important;
+        }
+
+        .login-token-spacing {
+          letter-spacing: 24px !important;
+        }
+      }
+    </style>
   </head>
   <body
     style="
       margin: 0;
       padding: 0;
-      font-family:
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background-color: #11111b;
+      color: #cdd6f4;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     "
   >
     <table
@@ -26,64 +67,36 @@
       cellpadding="0"
       cellspacing="0"
       border="0"
-      style="background-color: #1e1e2e;"
+      style="width: 100%; background-color: #11111b"
     >
       <tr>
-        <td style="padding: 20px 0">
+        <td class="page-padding" style="padding: 48px 24px">
           <table
             role="presentation"
+            width="100%"
             align="center"
             cellpadding="0"
             cellspacing="0"
             border="0"
-            style="width: 100%; max-width: 600px"
+            style="width: 100%; max-width: 560px"
           >
             <tr>
               <td
                 style="
+                  padding-bottom: 32px;
                   text-align: center;
-                  padding: 40px 20px 30px;
-                  color: #b4befe;
                   font-size: 24px;
-                  font-weight: 600;
+                  line-height: 30px;
+                  letter-spacing: -0.3px;
                 "
               >
-                lnkr
+                <a href="https://lnkr.by" style="text-decoration: none">
+                  <span style="color: #89b4fa; font-weight: 700">lnkr</span><span style="color: #7f849c; font-weight: 500">.by</span>
+                </a>
               </td>
             </tr>
 
-            <tr>
-              <td
-                style="
-                  padding: 20px 40px;
-                  color: #cdd6f4;
-                  line-height: 1.6;
-                "
-              >
-                {% block content %}{% endblock %}
-              </td>
-            </tr>
-
-            <tr>
-              <td
-                style="
-                  padding: 30px 40px;
-                  text-align: center;
-                  color: #bac2de;
-                  font-size: 14px;
-                "
-              >
-                <a
-                  href="https://lnkr.by"
-                  style="
-                    color: #89b4fa;
-                    text-decoration: none;
-                    font-weight: 600;
-                  "
-                  >lnkr.by</a
-                >
-              </td>
-            </tr>
+            {% block content %}{% endblock %}
           </table>
         </td>
       </tr>

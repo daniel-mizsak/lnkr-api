@@ -84,13 +84,10 @@ just deploy-production
 - Add callback URL to request login token endpoint and attach to login_url.
 - Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.
-- Attach the client user agent (parsed OS and browser) to both the forward and request login token operations.
-- Add the originating location (country) to the login token email.
 - Improve rate limiting.
 - Automatic deployment to production when GitHub release is created.
 - Add more in-depth logging.
 - No 3rd party service for sending emails. Self-hosted SMTP server.
-- Update email template based on the look of the frontend and update button's link.
 - Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
 
 <hr>
