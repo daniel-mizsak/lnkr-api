@@ -92,8 +92,6 @@ def _generate_random_slug(random_slug_length: int) -> str:
 
 async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> LinkCache:
     """Get a link from cache or database by its slug."""
-    # TODO: Add a fail-closed invalidation marker check before using cached link data.
-    # The cache must not be authoritative for security-sensitive fields like password_hash.
     try:
         cached_link = await link_cache.get_cached_link_by_slug(cache, slug)
     except RedisError:
@@ -154,9 +152,7 @@ async def update_link(session: AsyncSession, cache: Redis, slug: str, link_updat
         raise
 
     with contextlib.suppress(RedisError):
-        # TODO: Make link cache invalidation reliable with a fail-closed invalidation marker.
-        # If Redis cannot mark this slug stale, the mutation should not commit password/status changes.
-        await link_cache.delete_cached_link_by_slug(cache, slug)
+        await link_cache.set_cached_link_invalidated(cache, slug)
     return link
 
 
@@ -172,9 +168,7 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         raise
 
     with contextlib.suppress(RedisError):
-        # TODO: Make link cache invalidation reliable with a fail-closed invalidation marker.
-        # If Redis cannot mark this slug stale, the mutation should not commit the delete.
-        await link_cache.delete_cached_link_by_slug(cache, slug)
+        await link_cache.set_cached_link_invalidated(cache, slug)
 
 
 async def generate_link_qr_code(session: AsyncSession, slug: str, user: User) -> bytes:

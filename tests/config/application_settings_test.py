@@ -30,7 +30,7 @@ def test_application_settings() -> None:
     assert application_settings.ACCESS_TOKEN_EXPIRE_MINUTES == 30
     assert application_settings.ACCESS_TOKEN_ALGORITHM == "HS256"  # noqa: S105
 
-    assert application_settings.LINK_CACHE_TTL_SECONDS == 60 * 60 * 24  # 24 hours
+    assert application_settings.LINK_CACHE_TTL_SECONDS == 60  # 1 minute
 
     # User
     assert application_settings.USER_LINK_LIMIT == 100

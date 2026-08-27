@@ -24,7 +24,7 @@ from lnkr.exceptions import (
     UserDoesNotExistError,
     UserLinkLimitExceededError,
 )
-from lnkr.models import Link, LinkCache, LinkCreate, LinkStatus, User
+from lnkr.models import Link, LinkCache, LinkCreate, LinkStatus, LinkUpdate, User
 from lnkr.services import link_service
 
 if TYPE_CHECKING:
@@ -226,32 +226,68 @@ async def test_get_link_validate_user__ownership_validated(
         await link_service.get_link_validate_user(session, link.slug, user_other)
 
 
-async def test_get_link_validate_user__slug_does_not_exist(
-    session: AsyncSession,
-    user: User,
-    slug: str,
-) -> None:
+async def test_get_link_validate_user__slug_does_not_exist(session: AsyncSession, user: User, slug: str) -> None:
     with pytest.raises(SlugDoesNotExistError):
         await link_service.get_link_validate_user(session, slug, user)
 
 
-async def test_delete_link__cache_failure_ignored(
+async def test_update_link__cache_invalidated(session: AsyncSession, link: Link, user: User, target_url: str) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    set_cached_link_invalidated = mock.AsyncMock()
+    link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
+        updated_link = await link_service.update_link(session, cache, link.slug, link_update, user)
+
+    assert updated_link.target_url == f"{target_url}/updated"
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+
+
+async def test_update_link__cache_failure_ignored(
     session: AsyncSession,
     link: Link,
     user: User,
+    target_url: str,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    with mock.patch.object(
-        link_service.link_cache,
-        "delete_cached_link_by_slug",
-        mock.AsyncMock(side_effect=RedisError()),
-    ):
+    set_cached_link_invalidated = mock.AsyncMock(side_effect=RedisError())
+    link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
+        updated_link = await link_service.update_link(session, cache, link.slug, link_update, user)
+
+    assert updated_link.target_url == f"{target_url}/updated"
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+
+
+async def test_delete_link__cache_invalidated(session: AsyncSession, link: Link, user: User) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    set_cached_link_invalidated = mock.AsyncMock()
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
         await link_service.delete_link(session, cache, link.slug, user)
 
     assert await link_service.link_database.get_link_by_slug(session, link.slug) is None
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+
+
+async def test_delete_link__cache_failure_ignored(session: AsyncSession, link: Link, user: User) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    set_cached_link_invalidated = mock.AsyncMock(side_effect=RedisError())
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
+        await link_service.delete_link(session, cache, link.slug, user)
+
+    assert await link_service.link_database.get_link_by_slug(session, link.slug) is None
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
 
 
 async def test_list_links__normalizes_search_and_caps_page_size(user: User) -> None:
@@ -282,11 +318,7 @@ async def test_list_links__normalizes_search_and_caps_page_size(user: User) -> N
     )
 
 
-async def test_list_links__blank_search_treated_as_unfiltered(
-    session: AsyncSession,
-    user: User,
-    link: Link,
-) -> None:
+async def test_list_links__blank_search_treated_as_unfiltered(session: AsyncSession, user: User, link: Link) -> None:
     session.add(link)
     await session.commit()
     favorites_only = False
