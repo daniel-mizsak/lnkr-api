@@ -37,7 +37,7 @@ class ApplicationSettings(BaseSettings):
 
     FRONTEND_API_KEY: SecretStr
 
-    LINK_CACHE_TTL_SECONDS: int = 60 * 60 * 24  # 24 hours
+    LINK_CACHE_TTL_SECONDS: int = 60  # 1 minute
 
     SENTRY_DSN: SecretStr | None = None
 

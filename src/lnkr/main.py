@@ -59,7 +59,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(
-    title="lnkr", description="Link manager REST API.", version=application_settings.API_VERSION, lifespan=lifespan
+    title="lnkr",
+    description="Link manager REST API.",
+    version=application_settings.API_VERSION,
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": 0,
+        "displayRequestDuration": True,
+    },
 )
 
 
