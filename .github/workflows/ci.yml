@@ -8,7 +8,7 @@ on:
   pull_request:
   schedule:
     - cron: "0 12 * * 6" # Every Saturday at 12:00
-  workflow_call:
+  workflow_call: {}
 
 permissions: {}
 
