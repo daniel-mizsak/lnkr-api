@@ -14,6 +14,10 @@ SECURITY_SUGGESTIONS: false
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 
+# TODO: Remove once actionlint supports $/ references (https://github.com/rhysd/actionlint/issues/711).
+ACTION_ACTIONLINT_ARGUMENTS: >-
+  -ignore '^reusable workflow call "\$/\.github/workflows/ci\.yml" at "uses" is not following the format'
+ACTION_ZIZMOR_DISABLE_ERRORS: true # TODO: Remove this once the zizmor version is updated in MegaLinter.
 ANSIBLE_ANSIBLE_LINT_CONFIG_FILE: .github/linters/.ansible-lint.yml
 ANSIBLE_ANSIBLE_LINT_PRE_COMMANDS:
   - command: ansible-galaxy collection install --requirements-file ./deployment/ansible/requirements.yml

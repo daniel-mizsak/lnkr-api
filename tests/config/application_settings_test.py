@@ -1,5 +1,5 @@
 """
-Tests for the lnkr configurations.
+Tests for application settings.
 
 These tests ensure that changes to the default configurations will break the tests.
 Otherwise, (since the api tests are using references to the default values) the tests

@@ -43,7 +43,7 @@ async def create_link(session: AsyncSession, link_create: LinkCreate, user: User
     """Create a link in the database."""
     password_hash: str | None = None
     if link_create.password is not None:
-        password_hash = await _hash_password(link_create.password)
+        password_hash = await hash_password(link_create.password)
 
     try:
         locked_user = await user_database.get_user_by_id_for_update(session, user.id)
@@ -139,7 +139,7 @@ async def update_link(session: AsyncSession, cache: Redis, slug: str, link_updat
     link = await get_link_validate_user(session, slug, user)
     password_hash: str | None = None
     if ("password" in link_update.model_fields_set) and (link_update.password is not None):
-        password_hash = await _hash_password(link_update.password)
+        password_hash = await hash_password(link_update.password)
 
     link.update_from_link_update(link_update, password_hash=password_hash)
 
@@ -180,7 +180,7 @@ async def generate_link_qr_code(session: AsyncSession, slug: str, user: User) ->
 
 def _generate_qr_code(content: str) -> bytes:
     buffer = io.BytesIO()
-    segno.make(content, error="M").save(buffer, kind="png", scale=20)
+    segno.make(content, error="M").save(buffer, kind="png", scale=20, border=2)
     return buffer.getvalue()
 
 
@@ -213,7 +213,8 @@ async def list_links(
 _password_hasher = PasswordHasher()
 
 
-async def _hash_password(password: str) -> str:
+async def hash_password(password: str) -> str:
+    """Hash a password without blocking the event loop."""
     return await to_thread.run_sync(_password_hasher.hash, password)
 
 

@@ -14,6 +14,7 @@ Code lives in `src/lnkr` (`api`, `services`, `database`, `cache`, `config`, `mod
 
 ## Policies
 
+- Only run read-only Git commands. Any Git operation that changes repository state requires explicit user permission; harness approval does not count.
 - Requires Python 3.14.
 - PEP 758's `except A, B:` syntax is intentional; do not flag or rewrite it.
 - When implementing new features, do not add tests until explicitly asked.

@@ -74,8 +74,7 @@ check-all: lint type coverage
 [group("qa-extra")]
 megalinter:
     just clean
-    npx mega-linter-runner --flavor cupcake --env "MEGALINTER_CONFIG=.github/linters/.megalinter.yml"
-    just install
+    trap 'just install' EXIT; npx mega-linter-runner --flavor cupcake --env "MEGALINTER_CONFIG=.github/linters/.megalinter.yml"
 
 [group("qa-extra")]
 prek:

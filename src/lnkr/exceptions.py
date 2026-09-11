@@ -147,27 +147,6 @@ class RefreshTokenGenerationError(LnkrError):
         )
 
 
-class UserAlreadyExistsError(LnkrError):
-    """Raised when a user already exists in the database."""
-
-    def __init__(self, email: str) -> None:
-        """Initialize with default error message."""
-        msg = f"User '{email}' already exists"
-        super().__init__(msg)
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "user_already_exists",
-                },
-            ],
-        )
-
-
 class UserDoesNotExistError(LnkrError):
     """Raised when a user does not exist in the database."""
 
