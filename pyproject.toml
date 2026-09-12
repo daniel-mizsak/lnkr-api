@@ -13,8 +13,8 @@
   dependencies = [
     "PyJWT==2.13.0",
     "SQLAlchemy[asyncio]==2.0.52",
-    "alembic[tz]==1.19.1",
-    "anyio==4.15.0",
+    "alembic[tz]==1.19.2",
+    "anyio==4.15.1",
     "argon2-cffi==25.1.0",
     "fastapi[standard]==0.141.1",
     "geoip2==5.3.0",
