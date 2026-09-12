@@ -1,5 +1,5 @@
 """
-Tests for non-trivial link database queries.
+Tests for link database operations.
 
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """

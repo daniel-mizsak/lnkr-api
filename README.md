@@ -81,14 +81,17 @@ just deploy-production
 
 ### Future improvements
 
+- Add sorting links by click count.
+- Add user deletion.
 - Add callback URL to request login token endpoint and attach to login_url.
-- Use `secrets_dir="/run/secrets"` for docker secrets in production.
 - Remove old login tokens with a scheduled cleanup task.
 - Improve rate limiting.
-- Automatic deployment to production when GitHub release is created.
 - Add more in-depth logging.
-- No 3rd party service for sending emails. Self-hosted SMTP server.
 - Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
+- Add dedicated concurrency tests with separate database sessions and controlled synchronization to verify race-condition handling for login token consumption, user creation, refresh token rotation, and user link limits.
+- Automatic deployment to production when GitHub release is created.
+- Use `secrets_dir="/run/secrets"` for docker secrets in production.
+- No 3rd party service for sending emails. Self-hosted SMTP server.
 
 <hr>
 

@@ -1,5 +1,5 @@
 """
-Tests for the email service boundary.
+Tests for the email service.
 
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """

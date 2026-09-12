@@ -10,17 +10,19 @@ import string
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
 from lnkr.database.tokens import login_token_database
 from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError
-from lnkr.models import LoginToken
+from lnkr.models import LoginToken, UserCreate
+from lnkr.services.tokens.refresh_token_service import create_refresh_token_without_commit
+from lnkr.services.user_service import get_or_create_user_without_commit
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from lnkr.models import IpAddress, LoginTokenCreate, UserAgent
+    from lnkr.models import IpAddress, LoginTokenCreate, User, UserAgent
 
 
 LOGIN_TOKEN_LENGTH = 6
@@ -34,37 +36,32 @@ async def create_and_save_login_token(
     user_agent: UserAgent,
 ) -> str:
     """Create a login token and save it to the database."""
-    try:
-        login_token_value = await _create_login_token_without_commit(
+    async with session.begin():
+        return await _create_login_token_without_commit(
             session,
             login_token_create,
             ip_address,
             country_code,
             user_agent,
         )
-        await session.commit()
-    except LoginTokenGenerationError, SQLAlchemyError:
-        await session.rollback()
-        raise
-
-    return login_token_value
 
 
-async def consume_login_token(session: AsyncSession, login_token_value: str) -> LoginToken:
-    """Atomically validate and consume a login token."""
+async def authenticate_with_login_token(session: AsyncSession, login_token_value: str) -> tuple[User, str]:
+    """Consume a login token and issue a refresh token in one transaction."""
+    async with session.begin():
+        login_token = await consume_login_token_without_commit(session, login_token_value)
+        user = await get_or_create_user_without_commit(session, UserCreate(email=login_token.email))
+        refresh_token_value = await create_refresh_token_without_commit(session, user.id)
+
+    return user, refresh_token_value
+
+
+async def consume_login_token_without_commit(session: AsyncSession, login_token_value: str) -> LoginToken:
+    """Consume a login token without committing; the caller owns the transaction."""
     token_hash = _hash_token(login_token_value)
-
-    try:
-        login_token = await login_token_database.consume_login_token(session, token_hash)
-        if login_token is None:
-            await session.rollback()
-            raise LoginTokenInvalidError
-
-        await session.commit()
-    except SQLAlchemyError:
-        await session.rollback()
-        raise
-
+    login_token = await login_token_database.consume_login_token(session, token_hash)
+    if login_token is None:
+        raise LoginTokenInvalidError
     return login_token
 
 

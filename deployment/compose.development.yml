@@ -5,7 +5,8 @@ services:
       context: ..
       dockerfile: deployment/Dockerfile.development
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     command: ["bash", "scripts/run-database-migrations.sh"]
     environment:
       POSTGRES_HOST: "${POSTGRES_HOST}"
@@ -18,10 +19,14 @@ services:
       context: ..
       dockerfile: deployment/Dockerfile.development
     depends_on:
-      - database-migrations
-      - postgres
-      - redis
-      - mailpit
+      database-migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mailpit:
+        condition: service_started
     develop:
       watch:
         - path: ../src
@@ -61,6 +66,19 @@ services:
     container_name: postgres
     user: postgres
     shm_size: "256mb"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "--host=localhost",
+          "--username=${POSTGRES_USERNAME}",
+          "--dbname=${POSTGRES_DATABASE}",
+        ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
 

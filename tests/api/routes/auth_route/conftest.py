@@ -1,5 +1,5 @@
 """
-Fixtures used in testing auth api routes.
+Fixtures used in testing authentication API routes.
 
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """

@@ -26,18 +26,16 @@ from lnkr.models import (
     LoginTokenVerify,
     RefreshTokenRevoke,
     RefreshTokenRotate,
-    UserCreate,
 )
 from lnkr.services.email_service import send_email
 from lnkr.services.geoip_service import get_country_code_from_ip, get_country_flag_from_country_code
 from lnkr.services.tokens.access_token_service import create_access_token
-from lnkr.services.tokens.login_token_service import consume_login_token, create_and_save_login_token
+from lnkr.services.tokens.login_token_service import authenticate_with_login_token, create_and_save_login_token
 from lnkr.services.tokens.refresh_token_service import (
-    create_and_save_refresh_token,
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from lnkr.services.user_service import get_or_create_user, get_user_by_id
+from lnkr.services.user_service import get_user_by_id
 
 if TYPE_CHECKING:
     from geoip2.database import Reader
@@ -91,18 +89,13 @@ async def verify_login_token_endpoint(
 ) -> AuthTokensRead:
     """Verify login token and return authentication tokens."""
     try:
-        login_token = await consume_login_token(session, login_token_verify.login_token_value)
+        user, refresh_token = await authenticate_with_login_token(session, login_token_verify.login_token_value)
     except LoginTokenInvalidError as login_token_invalid_error:
         login_token_invalid_error.raise_http_exception()
-
-    user = await get_or_create_user(session, UserCreate(email=login_token.email))
-    access_token = create_access_token(user_id=user.id)
-    try:
-        # TODO: Make login-token consumption and refresh-token creation atomic so
-        # a retryable refresh-token failure does not consume the login token.
-        refresh_token = await create_and_save_refresh_token(session, user.id)
     except RefreshTokenGenerationError as refresh_token_generation_error:
         refresh_token_generation_error.raise_http_exception()
+
+    access_token = create_access_token(user_id=user.id)
     return AuthTokensRead(access_token=access_token, refresh_token=refresh_token)
 
 

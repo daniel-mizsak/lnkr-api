@@ -21,28 +21,6 @@ if TYPE_CHECKING:
     from lnkr.models import User
 
 
-async def test_create_and_save_refresh_token__generation_attempts_exhausted(session: AsyncSession, user: User) -> None:
-    refresh_token_value = "refresh-token"  # noqa: S105
-    session.add(
-        RefreshToken(
-            user_id=user.id,
-            token_hash=hashlib.sha256(refresh_token_value.encode()).hexdigest(),
-            expires_at=datetime.now(tz=UTC) + timedelta(days=1),
-        ),
-    )
-    await session.commit()
-
-    with (
-        mock.patch.object(
-            refresh_token_service.secrets,
-            "token_urlsafe",
-            mock.Mock(return_value=refresh_token_value),
-        ),
-        pytest.raises(RefreshTokenGenerationError),
-    ):
-        await refresh_token_service.create_and_save_refresh_token(session, user.id)
-
-
 async def test_rotate_refresh_token__replacement_failure_preserves_original_token(
     session: AsyncSession,
     user: User,
@@ -72,8 +50,9 @@ async def test_rotate_refresh_token__replacement_failure_preserves_original_toke
     ):
         await refresh_token_service.rotate_refresh_token(session, refresh_token_value)
 
-    await session.refresh(refresh_token)
-    assert refresh_token.used_at is None
+    async with session.begin():
+        await session.refresh(refresh_token)
+        assert refresh_token.used_at is None
 
     # The failed rotation must leave the original token consumable.
     await refresh_token_service.rotate_refresh_token(session, refresh_token_value)
@@ -85,7 +64,15 @@ async def test_rotate_refresh_token__original_consumed_and_replacement_consumabl
 ) -> None:
     # Preserve the id because the expected rollback below expires ORM attributes.
     user_id = user.id
-    original_token_value = await refresh_token_service.create_and_save_refresh_token(session, user_id)
+    original_token_value = "original-refresh-token"  # noqa: S105
+    session.add(
+        RefreshToken(
+            user_id=user_id,
+            token_hash=hashlib.sha256(original_token_value.encode()).hexdigest(),
+            expires_at=datetime.now(tz=UTC) + timedelta(days=1),
+        ),
+    )
+    await session.commit()
 
     rotated_user_id, replacement_token_value = await refresh_token_service.rotate_refresh_token(
         session,

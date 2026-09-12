@@ -47,18 +47,15 @@ async def test_verify_login_token__login_token_invalid(client: AsyncClient) -> N
     assert error["type"] == "login_token_invalid"
 
 
-async def test_verify_login_token__refresh_token_generation_failure(
-    client: AsyncClient,
-    issued_login_token: str,
-) -> None:
+async def test_verify_login_token__refresh_token_generation_failure(client: AsyncClient) -> None:
     with mock.patch.object(
         auth_route,
-        "create_and_save_refresh_token",
+        "authenticate_with_login_token",
         mock.AsyncMock(side_effect=RefreshTokenGenerationError()),
     ):
         response = await client.post(
             url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
-            json={"login_token_value": issued_login_token},
+            json={"login_token_value": "value"},
         )
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 def _expected_qr_code(slug: str) -> bytes:
     buffer = io.BytesIO()
     short_url = f"{application_settings.FRONTEND_FORWARD_URL}/{slug}"
-    segno.make(short_url, error="M").save(buffer, kind="png", scale=20)
+    segno.make(short_url, error="M").save(buffer, kind="png", scale=20, border=2)
     return buffer.getvalue()
 
 
