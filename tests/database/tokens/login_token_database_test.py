@@ -7,6 +7,8 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
 from lnkr.database.tokens import login_token_database
 from lnkr.models import LoginToken
 
@@ -41,3 +43,20 @@ async def test_consume_login_token__rejects_expired_token(session: AsyncSession,
     await session.commit()
 
     assert await login_token_database.consume_login_token(session, login_token.token_hash) is None
+
+
+async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(session: AsyncSession, email: str) -> None:
+    now = datetime.now(tz=UTC)
+    tokens = [
+        LoginToken(token_hash="a" * 64, email=email, expires_at=now + timedelta(minutes=10)),
+        LoginToken(token_hash="b" * 64, email=email, expires_at=now + timedelta(minutes=1), used_at=now),
+        LoginToken(token_hash="c" * 64, email=email, expires_at=now - timedelta(minutes=10)),
+        LoginToken(token_hash="d" * 64, email=f"other_{email}", expires_at=now + timedelta(minutes=1)),
+    ]
+    session.add_all(tokens)
+    await session.commit()
+    other_token_id = tokens[-1].id
+
+    await login_token_database.delete_login_tokens_by_email(session, email)
+
+    assert list((await session.scalars(select(LoginToken.id))).all()) == [other_token_id]

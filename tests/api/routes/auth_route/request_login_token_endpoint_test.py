@@ -41,8 +41,8 @@ async def test_request_login_token__login_token_generation_failure(
     mock_send_email: mock.AsyncMock,
     email: str,
 ) -> None:
-    create_login_token = mock.AsyncMock(side_effect=LoginTokenGenerationError())
-    with mock.patch.object(auth_route, "create_and_save_login_token", create_login_token):
+    create_and_save_login_token = mock.AsyncMock(side_effect=LoginTokenGenerationError())
+    with mock.patch.object(auth_route, "create_and_save_login_token", create_and_save_login_token):
         response = await client.post(
             url=f"{application_settings.AUTH_PREFIX}/request-login-token",
             json={"email": email},
@@ -52,7 +52,7 @@ async def test_request_login_token__login_token_generation_failure(
     error = response.json()["detail"][0]
     assert error["msg"] == "Unable to generate a login token. Please try again."
     assert error["type"] == "login_token_generation_failed"
-    create_login_token.assert_awaited_once()
+    create_and_save_login_token.assert_awaited_once()
     mock_send_email.assert_not_awaited()
 
 

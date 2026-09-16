@@ -201,7 +201,11 @@ class Link(Base):
         nullable=False,
     )
     user: Mapped[User] = relationship(back_populates="links")
-    clicks: Mapped[list[Click]] = relationship(back_populates="link", cascade="all, delete-orphan")
+    clicks: Mapped[list[Click]] = relationship(
+        back_populates="link",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     @classmethod
     def from_link_create(cls, link_create: LinkCreate, user: User, password_hash: str | None = None) -> Link:

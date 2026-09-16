@@ -4,17 +4,22 @@ High level services for user management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import contextlib
 from typing import TYPE_CHECKING
 
-from sqlalchemy.exc import IntegrityError
+from redis.exceptions import RedisError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from lnkr.database import user_database
+from lnkr.cache import link_cache
+from lnkr.database import link_database, user_database
+from lnkr.database.tokens import login_token_database
 from lnkr.exceptions import UserDoesNotExistError
 from lnkr.models import User, UserCreate
 
 if TYPE_CHECKING:
     import uuid
 
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -49,3 +54,24 @@ async def get_or_create_user_without_commit(session: AsyncSession, user_create: 
         return await get_user_by_email(session, user_create.email)
 
     return user
+
+
+async def delete_user(session: AsyncSession, cache: Redis, user: User) -> None:
+    """Delete a user from the database."""
+    user_id = user.id
+    try:
+        locked_user = await user_database.get_user_by_id_for_update(session, user_id)
+        if locked_user is None:
+            await session.rollback()
+            raise UserDoesNotExistError.by_id(user_id=user_id)
+
+        slugs = await link_database.get_link_slugs_by_user(session, user_id)
+        await login_token_database.delete_login_tokens_by_email(session, locked_user.email)
+        await user_database.delete_user(session, locked_user)
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
+
+    with contextlib.suppress(RedisError):
+        await link_cache.set_cached_links_invalidated(cache, slugs)

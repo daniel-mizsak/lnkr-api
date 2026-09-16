@@ -39,3 +39,9 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     """Get user from database by email."""
     result = await session.execute(select(User).where(User.email == email).limit(1))
     return result.scalars().first()
+
+
+async def delete_user(session: AsyncSession, user: User) -> None:
+    """Delete a user from database without committing the transaction."""
+    await session.delete(user)
+    await session.flush()

@@ -82,7 +82,6 @@ just deploy-production
 ### Future improvements
 
 - Add sorting links by click count.
-- Add user deletion.
 - Add callback URL to request login token endpoint and attach to login_url.
 - Remove old login tokens with a scheduled cleanup task.
 - Improve rate limiting.

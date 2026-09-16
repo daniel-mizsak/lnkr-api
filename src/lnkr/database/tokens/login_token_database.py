@@ -7,7 +7,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import update
+from sqlalchemy import delete, update
 
 from lnkr.models import LoginToken
 
@@ -39,3 +39,8 @@ async def consume_login_token(session: AsyncSession, token_hash: str) -> LoginTo
 
     result = await session.execute(statement)
     return result.scalars().first()
+
+
+async def delete_login_tokens_by_email(session: AsyncSession, email: str) -> None:
+    """Delete all login tokens for a given email without committing the transaction."""
+    await session.execute(delete(LoginToken).where(LoginToken.email == email))

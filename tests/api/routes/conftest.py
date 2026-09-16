@@ -52,6 +52,16 @@ OverrideGetCurrentUserFixture = Generator[OverrideGetCurrentUserFunction]
 
 
 @pytest.fixture()
+def override_authentication(client: AsyncClient) -> Generator[None]:  # noqa: ARG001
+    original_user = app.dependency_overrides.pop(get_current_user)
+
+    try:
+        yield
+    finally:
+        app.dependency_overrides[get_current_user] = original_user
+
+
+@pytest.fixture()
 def override_get_current_user(client: AsyncClient) -> OverrideGetCurrentUserFixture:  # noqa: ARG001
     original_user = app.dependency_overrides[get_current_user]
 

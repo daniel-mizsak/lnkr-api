@@ -99,11 +99,11 @@ async def test_generate_unused_random_slug__retries_with_increasing_length(
     session.add(link)
     await session.commit()
 
-    generate_slug = mock.Mock(side_effect=[link.slug, slug_other])
-    with mock.patch.object(link_service, "_generate_random_slug", generate_slug):
+    generate_random_slug = mock.Mock(side_effect=[link.slug, slug_other])
+    with mock.patch.object(link_service, "_generate_random_slug", generate_random_slug):
         assert await link_service.generate_unused_random_slug(session) == slug_other
 
-    assert generate_slug.call_args_list == [mock.call(6), mock.call(7)]
+    assert generate_random_slug.call_args_list == [mock.call(6), mock.call(7)]
 
 
 async def test_generate_unused_random_slug__exhaustion_raises_domain_error(session: AsyncSession, link: Link) -> None:
@@ -139,10 +139,10 @@ async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
     await session.commit()
 
     cache = mock.AsyncMock()
-    get_cached_link = mock.AsyncMock(return_value=None)
+    get_cached_link_by_slug = mock.AsyncMock(return_value=None)
     add_cached_link = mock.AsyncMock()
     with (
-        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link),
+        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link_by_slug),
         mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
     ):
         result = await link_service.get_cached_link(session, cache, link.slug)
@@ -156,10 +156,10 @@ async def test_get_cached_link__cache_read_failure_treated_as_miss(session: Asyn
     await session.commit()
 
     cache = mock.AsyncMock()
-    get_cached_link = mock.AsyncMock(side_effect=RedisError())
+    get_cached_link_by_slug = mock.AsyncMock(side_effect=RedisError())
     add_cached_link = mock.AsyncMock()
     with (
-        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link),
+        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link_by_slug),
         mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
     ):
         result = await link_service.get_cached_link(session, cache, link.slug)

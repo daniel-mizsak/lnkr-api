@@ -54,7 +54,7 @@ class User(Base):
         default=UserStatus.REGULAR,
         nullable=False,
     )
-    links: Mapped[list[Link]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    links: Mapped[list[Link]] = relationship(back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
     @classmethod
     def from_user_create(cls, user_create: UserCreate) -> User:

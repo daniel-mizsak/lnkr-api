@@ -48,3 +48,15 @@ async def set_cached_link_invalidated(cache: Redis, slug: str) -> None:
         _LINK_INVALIDATED,
         ex=_LINK_INVALIDATION_TTL_SECONDS,
     )
+
+
+async def set_cached_links_invalidated(cache: Redis, slugs: list[str]) -> None:
+    """Mark slugs as invalidated in a single batch to prevent stale cache fills."""
+    async with cache.pipeline(transaction=False) as pipeline:
+        for slug in slugs:
+            pipeline.set(
+                f"link:{slug}",
+                _LINK_INVALIDATED,
+                ex=_LINK_INVALIDATION_TTL_SECONDS,
+            )
+        await pipeline.execute()
