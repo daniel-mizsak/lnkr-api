@@ -46,7 +46,7 @@ class LoginToken(Base):
     __tablename__ = "login_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(EMAIL_MAX_LENGTH), nullable=False)
+    email: Mapped[str] = mapped_column(String(EMAIL_MAX_LENGTH), index=True, nullable=False)
     token_hash: Mapped[str] = mapped_column(String(TOKEN_HASH_LENGTH), unique=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

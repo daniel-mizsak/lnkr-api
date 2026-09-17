@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
+from lnkr.database import user_database
 from lnkr.database.tokens import refresh_token_database
 from lnkr.exceptions import RefreshTokenGenerationError, RefreshTokenInvalidError
 from lnkr.models import RefreshToken
@@ -53,6 +54,15 @@ async def rotate_refresh_token(session: AsyncSession, refresh_token_value: str) 
     token_hash = _hash_token(refresh_token_value)
 
     async with session.begin():
+        refresh_token = await refresh_token_database.get_refresh_token_by_hash(session, token_hash)
+        if refresh_token is None:
+            raise RefreshTokenInvalidError
+
+        # Match account deletion's lock order before consuming or replacing the token.
+        user = await user_database.get_user_by_id_for_update(session, refresh_token.user_id)
+        if user is None:
+            raise RefreshTokenInvalidError
+
         refresh_token = await refresh_token_database.consume_refresh_token(session, token_hash)
         if refresh_token is None:
             raise RefreshTokenInvalidError

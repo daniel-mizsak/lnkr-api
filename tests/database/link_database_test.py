@@ -17,6 +17,21 @@ if TYPE_CHECKING:
     from lnkr.models import User
 
 
+async def test_get_link_slugs_by_user__all_owned_slugs_only(
+    session: AsyncSession,
+    user: User,
+    user_other: User,
+    target_url: str,
+) -> None:
+    slugs = [f"slug-{index}" for index in range(100)]
+    session.add_all([Link(slug=slug, target_url=target_url, user=user) for slug in slugs])
+    session.add(Link(slug="other", target_url=target_url, user=user_other))
+    await session.commit()
+
+    assert set(await link_database.get_link_slugs_by_user(session, user.id)) == set(slugs)
+    assert await link_database.get_link_slugs_by_user(session, uuid.uuid4()) == []
+
+
 async def test_list_links_by_user__filters_counts_and_paginates(
     session: AsyncSession,
     user: User,

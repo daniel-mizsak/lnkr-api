@@ -35,6 +35,12 @@ async def delete_link(session: AsyncSession, link: Link) -> None:
     await session.flush()
 
 
+async def get_link_slugs_by_user(session: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """Get every slug owned by a user."""
+    result = await session.execute(select(Link.slug).where(Link.user_id == user_id))
+    return list(result.scalars().all())
+
+
 async def count_links_by_user(session: AsyncSession, user_id: uuid.UUID) -> int:
     """Count the number of links owned by a user."""
     statement = select(func.count()).where(Link.user_id == user_id)

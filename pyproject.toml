@@ -23,7 +23,7 @@
     "pydantic-settings==2.15.0",
     "redis==8.1.0",
     "segno==1.6.6",
-    "sentry-sdk==2.68.1",
+    "sentry-sdk==2.69.1",
     "ua-parser[regex]==1.0.2",
   ]
 
@@ -37,16 +37,16 @@
     "ansible-lint==26.8.0",
     "beautifulsoup4==4.15.0",
     "coverage==7.16.0",
-    "fakeredis==2.37.1",
+    "fakeredis==2.38.0",
     "prek==0.5.2",
     "pytest-asyncio==1.4.0",
     "pytest==9.1.1",
     "testcontainers[postgres]==4.15.0",
-    "ty==0.0.78",
+    "ty==0.0.79",
   ]
   lint = ["ruff==0.16.6"]
   deployment = [
-    "ansible==14.3.1",
+    "ansible==14.4.0",
     "pulumi==3.261.0",
     "pulumi-cloudflare==6.20.0",
   ]

@@ -10,16 +10,16 @@ from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
+from redis.exceptions import RedisError
+from sqlalchemy.exc import SQLAlchemyError
 
 from lnkr.database.tokens import login_token_database
 from lnkr.exceptions import UserDoesNotExistError
-from lnkr.models import LoginToken, UserCreate
+from lnkr.models import Link, LoginToken, User, UserCreate
 from lnkr.services import user_service
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-
-    from lnkr.models import User
 
 
 async def test_get_user_by_id__user_does_not_exist(session: AsyncSession) -> None:
@@ -90,3 +90,97 @@ async def test_get_or_create_user_without_commit__conflict_preserves_outer_trans
     assert existing_user.email == email
     await session.refresh(login_token)
     assert login_token.used_at is not None
+
+
+async def test_delete_user__user_does_not_exist(session: AsyncSession, user: User) -> None:
+    user_id = user.id
+    await session.delete(user)
+    await session.commit()
+    with (
+        mock.patch.object(user_service.link_cache, "set_cached_links_invalidated") as set_cached_links_invalidated,
+        pytest.raises(UserDoesNotExistError, match=str(user_id)),
+    ):
+        await user_service.delete_user(session, mock.AsyncMock(), user)
+
+    assert not session.in_transaction()
+    set_cached_links_invalidated.assert_not_awaited()
+
+
+async def test_delete_user__deletion_failure_rolls_back_without_invalidating_cache(
+    session: AsyncSession,
+    user: User,
+    link: Link,
+) -> None:
+    user_id = user.id
+    link_id = link.id
+    login_token = LoginToken(
+        email=user.email,
+        token_hash="a" * 64,
+        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+    )
+    session.add_all([link, login_token])
+    await session.commit()
+
+    login_token_id = login_token.id
+    cache = mock.AsyncMock()
+    with (
+        mock.patch.object(
+            user_service.user_database, "delete_user", mock.AsyncMock(side_effect=SQLAlchemyError("database failure"))
+        ),
+        mock.patch.object(user_service.link_cache, "set_cached_links_invalidated") as set_cached_links_invalidated,
+        pytest.raises(SQLAlchemyError, match="database failure"),
+    ):
+        await user_service.delete_user(session, cache, user)
+
+    set_cached_links_invalidated.assert_not_awaited()
+    assert not session.in_transaction()
+    assert await session.get(User, user_id) is not None
+    assert await session.get(Link, link_id) is not None
+    assert await session.get(LoginToken, login_token_id) is not None
+
+
+async def test_delete_user__commit_failure_rolls_back_without_invalidating_cache(
+    session: AsyncSession,
+    user: User,
+    link: Link,
+) -> None:
+    user_id = user.id
+    link_id = link.id
+    login_token = LoginToken(
+        email=user.email,
+        token_hash="a" * 64,
+        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+    )
+    session.add_all([link, login_token])
+    await session.commit()
+
+    login_token_id = login_token.id
+    cache = mock.AsyncMock()
+    with (
+        mock.patch.object(session, "commit", mock.AsyncMock(side_effect=SQLAlchemyError("database failure"))),
+        mock.patch.object(user_service.link_cache, "set_cached_links_invalidated") as set_cached_links_invalidated,
+        pytest.raises(SQLAlchemyError, match="database failure"),
+    ):
+        await user_service.delete_user(session, cache, user)
+
+    set_cached_links_invalidated.assert_not_awaited()
+    assert not session.in_transaction()
+    assert await session.get(User, user_id) is not None
+    assert await session.get(Link, link_id) is not None
+    assert await session.get(LoginToken, login_token_id) is not None
+
+
+async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: User, link: Link) -> None:
+    user_id = user.id
+    slug = link.slug
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    set_cached_links_invalidated = mock.AsyncMock(side_effect=RedisError("cache failure"))
+    with mock.patch.object(user_service.link_cache, "set_cached_links_invalidated", set_cached_links_invalidated):
+        await user_service.delete_user(session, cache, user)
+
+    set_cached_links_invalidated.assert_awaited_once_with(cache, [slug])
+    assert await session.get(User, user_id) is None
+    assert await user_service.link_database.get_link_by_slug(session, slug) is None

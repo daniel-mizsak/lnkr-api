@@ -94,26 +94,26 @@ async def test_get_click_analytics__uses_four_week_local_date_period(link: Link)
         known_country_click_count=0,
         countries=[],
     )
-    get_summary = mock.AsyncMock(return_value=summary)
-    get_daily_clicks = mock.AsyncMock(return_value=daily_clicks)
-    get_top_countries = mock.AsyncMock(return_value=top_countries)
+    get_click_analytics_summary = mock.AsyncMock(return_value=summary)
+    get_click_analytics_daily_clicks = mock.AsyncMock(return_value=daily_clicks)
+    get_click_analytics_top_countries = mock.AsyncMock(return_value=top_countries)
     # datetime.now cannot be patched directly, so replace the imported class while wrapping its real behavior.
     datetime_mock = mock.Mock(wraps=datetime)
     datetime_mock.now.return_value = now
     with (
         mock.patch.object(click_service, "datetime", datetime_mock),
-        mock.patch.object(click_service, "get_click_analytics_summary", get_summary),
-        mock.patch.object(click_service, "get_click_analytics_daily_clicks", get_daily_clicks),
-        mock.patch.object(click_service, "get_click_analytics_top_countries", get_top_countries),
+        mock.patch.object(click_service, "get_click_analytics_summary", get_click_analytics_summary),
+        mock.patch.object(click_service, "get_click_analytics_daily_clicks", get_click_analytics_daily_clicks),
+        mock.patch.object(click_service, "get_click_analytics_top_countries", get_click_analytics_top_countries),
     ):
         analytics = await click_service.get_click_analytics(session, link, timezone)
 
     assert analytics.summary == summary
     assert analytics.daily_clicks == daily_clicks
     assert analytics.top_countries == top_countries
-    get_summary.assert_awaited_once_with(session, link, now)
-    get_daily_clicks.assert_awaited_once_with(session, link, period)
-    get_top_countries.assert_awaited_once_with(session, link, period)
+    get_click_analytics_summary.assert_awaited_once_with(session, link, now)
+    get_click_analytics_daily_clicks.assert_awaited_once_with(session, link, period)
+    get_click_analytics_top_countries.assert_awaited_once_with(session, link, period)
 
 
 async def test_get_click_analytics_summary__counts_total_and_last_seven_days(link: Link) -> None:
