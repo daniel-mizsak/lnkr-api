@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import IntegrityError
 
 from lnkr.config.application_settings import application_settings
+from lnkr.database import user_database
 from lnkr.database.tokens import login_token_database
 from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError
 from lnkr.models import LoginToken, UserCreate
@@ -49,8 +50,18 @@ async def create_and_save_login_token(
 async def authenticate_with_login_token(session: AsyncSession, login_token_value: str) -> tuple[User, str]:
     """Consume a login token and issue a refresh token in one transaction."""
     async with session.begin():
-        login_token = await consume_login_token_without_commit(session, login_token_value)
+        login_token = await login_token_database.get_login_token_by_hash(session, _hash_token(login_token_value))
+        if login_token is None:
+            raise LoginTokenInvalidError
+
         user = await get_or_create_user_without_commit(session, UserCreate(email=login_token.email))
+        # Match account deletion's lock order: user first, then token rows.
+        user = await user_database.get_user_by_id_for_update(session, user.id)
+        if user is None:
+            raise LoginTokenInvalidError
+
+        # Revalidate after acquiring the user lock; the token may have changed while waiting.
+        await consume_login_token_without_commit(session, login_token_value)
         refresh_token_value = await create_refresh_token_without_commit(session, user.id)
 
     return user, refresh_token_value

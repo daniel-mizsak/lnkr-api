@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from lnkr.database import user_database
-from lnkr.exceptions import LoginTokenGenerationError, RefreshTokenGenerationError
+from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError, RefreshTokenGenerationError
 from lnkr.models import IpAddress, LoginToken, LoginTokenCreate, RefreshToken, UserAgent
 from lnkr.services.tokens import login_token_service, refresh_token_service
 
@@ -23,10 +23,7 @@ if TYPE_CHECKING:
     from lnkr.models import User
 
 
-async def test_create_and_save_login_token__generation_attempts_exhausted(
-    session: AsyncSession,
-    email: str,
-) -> None:
+async def test_create_and_save_login_token__generation_attempts_exhausted(session: AsyncSession, email: str) -> None:
     generated_character = "A"
     login_token_value = generated_character * login_token_service.LOGIN_TOKEN_LENGTH
     session.add(
@@ -49,6 +46,51 @@ async def test_create_and_save_login_token__generation_attempts_exhausted(
             None,
             UserAgent(),
         )
+
+
+async def test_authenticate_with_login_token__user_does_not_exist(session: AsyncSession, user: User) -> None:
+    login_token_value = "ABC123"  # noqa: S105
+    login_token = LoginToken(
+        email=user.email,
+        token_hash=hashlib.sha256(login_token_value.encode()).hexdigest(),
+        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+    )
+    session.add(login_token)
+    await session.commit()
+
+    get_user_by_id_for_update = mock.AsyncMock(return_value=None)
+    with (
+        mock.patch.object(user_database, "get_user_by_id_for_update", get_user_by_id_for_update),
+        pytest.raises(LoginTokenInvalidError),
+    ):
+        await login_token_service.authenticate_with_login_token(session, login_token_value)
+
+    await session.refresh(login_token)
+    assert login_token.used_at is None
+    assert list((await session.scalars(select(RefreshToken.id))).all()) == []
+
+
+async def test_authenticate_with_login_token__expired_token_does_not_create_user(
+    session: AsyncSession,
+    email: str,
+) -> None:
+    login_token_value = "ABC123"  # noqa: S105
+    new_user_email = f"new_{email}"
+    login_token = LoginToken(
+        email=new_user_email,
+        token_hash=hashlib.sha256(login_token_value.encode()).hexdigest(),
+        expires_at=datetime.now(tz=UTC) - timedelta(minutes=1),
+    )
+    session.add(login_token)
+    await session.commit()
+
+    with pytest.raises(LoginTokenInvalidError):
+        await login_token_service.authenticate_with_login_token(session, login_token_value)
+
+    assert await user_database.get_user_by_email(session, new_user_email) is None
+    await session.refresh(login_token)
+    assert login_token.used_at is None
+    assert list((await session.scalars(select(RefreshToken.id))).all()) == []
 
 
 async def test_authenticate_with_login_token__refresh_failure_rolls_back_all_changes(
