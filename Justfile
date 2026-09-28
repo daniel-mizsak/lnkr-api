@@ -34,7 +34,7 @@ upgrade-ansible:
 
 [group("lifecycle")]
 geoip-update:
-    op run --env-file="deployment/.env.production" --no-masking -- ./scripts/update-geoip-database.sh
+    op run --env-file="deployment/.env.production" --no-masking -- ./deployment/ansible/files/geoip/update-geoip-database.sh
 
 [group("lifecycle")]
 fresh: clean install

@@ -11,11 +11,13 @@
   community.docker.docker_container:
     name: "{{ application_name }}-database-migration"
     image: ghcr.io/daniel-mizsak/lnkr-api:latest
-    command: ["bash", "scripts/run-database-migrations.sh"]
+    command: ["bash", "alembic/run-database-migrations.sh"]
     pull: always
     detach: false
     cleanup: true
     restart_policy: "no"
+    healthcheck:
+      test: ["NONE"]
     networks:
       - name: postgres
     env:
@@ -26,6 +28,26 @@
       POSTGRES_DATABASE: "{{ application_name }}"
   register: database_migration
   changed_when: "'[alembic.runtime.migration] Running upgrade' in database_migration.container.Output"
+
+- name: Run application cleanup
+  community.docker.docker_container:
+    name: "{{ application_name }}-cleanup"
+    image: ghcr.io/daniel-mizsak/lnkr-api:latest
+    command: ["lnkr-cleanup"]
+    pull: never
+    detach: false
+    cleanup: true
+    restart_policy: "no"
+    healthcheck:
+      test: ["NONE"]
+    networks:
+      - name: postgres
+    env:
+      POSTGRES_HOST: "{{ lookup('env', 'POSTGRES_HOST') }}"
+      POSTGRES_PORT: "{{ lookup('env', 'POSTGRES_PORT') }}"
+      POSTGRES_USERNAME: "{{ application_name }}"
+      POSTGRES_PASSWORD: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
+      POSTGRES_DATABASE: "{{ application_name }}"
 
 - name: Start application
   community.docker.docker_stack:

@@ -1,20 +1,20 @@
 # Project
 deployment/ansible/inventory.ini
-/geoip
+/geoip/
 
 # System
 .DS_Store
 
 # Development files
 .ansible
-.artifacts
-.cache
+.artifacts/
+.cache/
 .coverage
-.pytest_cache
-.ruff_cache
+.pytest_cache/
+.ruff_cache/
 coverage.xml
-htmlcov
-megalinter-reports
+htmlcov/
+megalinter-reports/
 
 # Python-generated files
 __pycache__/
@@ -26,7 +26,7 @@ wheels/
 
 # Environments
 .env
-.venv
+.venv/
 
 # IDE
-.vscode
+.vscode/

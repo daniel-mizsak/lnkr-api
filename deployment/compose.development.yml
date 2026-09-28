@@ -7,7 +7,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "scripts/run-database-migrations.sh"]
+    command: ["bash", "alembic/run-database-migrations.sh"]
     environment:
       POSTGRES_HOST: "${POSTGRES_HOST}"
       POSTGRES_USERNAME: "${POSTGRES_USERNAME}"

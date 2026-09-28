@@ -7,7 +7,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from lnkr.models import RefreshToken
 
@@ -66,3 +66,12 @@ async def revoke_refresh_token(session: AsyncSession, token_hash: str) -> Refres
 
     result = await session.execute(statement)
     return result.scalars().first()
+
+
+async def clean_up_refresh_tokens(session: AsyncSession) -> None:
+    """Delete all expired, used, or revoked refresh tokens without committing the transaction."""
+    now = datetime.now(tz=UTC)
+    statement = delete(RefreshToken).where(
+        (RefreshToken.expires_at <= now) | (RefreshToken.used_at.is_not(None)) | (RefreshToken.revoked_at.is_not(None))
+    )
+    await session.execute(statement)

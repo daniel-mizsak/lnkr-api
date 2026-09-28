@@ -27,6 +27,9 @@
     "ua-parser[regex]==1.0.2",
   ]
 
+  [project.scripts]
+    lnkr-cleanup = "lnkr.cleanup:main"
+
   [project.urls]
     Homepage = "https://api.lnkr.by"
     Repository = "https://github.com/daniel-mizsak/lnkr-api"
