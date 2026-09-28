@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 async def create_click(
     session: AsyncSession,
-    geoip_reader: Reader,
+    geoip_reader: Reader | None,
     click_create: ClickCreate,
     link_id: uuid.UUID,
 ) -> Click:

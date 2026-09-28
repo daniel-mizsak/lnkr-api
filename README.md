@@ -86,8 +86,6 @@ just deploy-production
 - Improve rate limiting for login token requests and verification, refresh token rotation, and password-protected link unlocking. Add per-email send limits and verify that client identification works through the production proxy and frontend.
 - Handle SMTP failures when requesting login tokens with a predictable API response and a clear retry path.
 - Add dedicated concurrency tests with separate database sessions and controlled synchronization to verify race-condition handling for login token consumption, user creation, refresh token rotation, and user link limits.
-- Remove expired and used login tokens, and expired and revoked refresh tokens, with a scheduled cleanup task and a defined retention period.
-- Allow the application to start and serve core functionality when the GeoIP database is unavailable, returning unknown geolocation instead.
 - Add essential operational logging for authentication, email delivery, and dependency failures, without exposing tokens or credentials. Review which personal data is sent to Sentry.
 - Rehearse restoring an encrypted backup and document deployment, recovery, and rollback steps. Use the same pinned release image for the application and database migrations instead of `latest`.
 

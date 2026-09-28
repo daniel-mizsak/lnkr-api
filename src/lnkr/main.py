@@ -4,6 +4,7 @@ Main application.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from maxminddb import InvalidDatabaseError
 
 from lnkr.api.main import api_router
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
@@ -21,6 +23,8 @@ from lnkr.database.initial_data import create_initial_data
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+logger = logging.getLogger(__name__)
 
 if (application_settings.SENTRY_DSN is not None) and (
     application_settings.ENVIRONMENT != ApplicationEnvironment.DEVELOPMENT
@@ -48,12 +52,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         f"{application_settings.REDIS_DATABASE_APPLICATION}",
         decode_responses=True,
     )
-    # TODO: Do not fail app startup if the GeoIP database is not available.
-    app.state.geoip_reader = geoip2.database.Reader(application_settings.GEOIP_COUNTRY_DATABASE_PATH)
+    try:
+        app.state.geoip_reader = geoip2.database.Reader(application_settings.GEOIP_COUNTRY_DATABASE_PATH)
+    except OSError, InvalidDatabaseError:
+        app.state.geoip_reader = None
+        logger.warning("GeoIP database is unavailable; geolocation will be unknown.")
 
     yield
 
-    app.state.geoip_reader.close()
+    if app.state.geoip_reader is not None:
+        app.state.geoip_reader.close()
     await app.state.cache.close()
     await engine.dispose()
 
