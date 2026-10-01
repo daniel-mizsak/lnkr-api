@@ -4,9 +4,11 @@ Tests for the forward to target url endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+import time_machine
 from fastapi import status
 from sqlalchemy import select
 
@@ -15,17 +17,16 @@ from lnkr.config.application_settings import application_settings
 from lnkr.models import Click, ClickSource
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from httpx2 import AsyncClient
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def test_forward_to_target_url__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -44,51 +45,45 @@ async def test_forward_to_target_url__active_link(
     )
 
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["target_url"] == target_url
 
 
+@pytest.mark.parametrize(
+    ("ip_headers", "expected_ip_address", "expected_country_code"),
+    [
+        pytest.param({}, None, None, id="missing"),
+        pytest.param({CLIENT_IP_HEADER: "8.8.8.8"}, "8.8.8.8", "US", id="public"),
+        pytest.param({CLIENT_IP_HEADER: "192.168.1.1"}, None, None, id="private"),
+        pytest.param({CLIENT_IP_HEADER: "not-an-ip"}, None, None, id="malformed"),
+    ],
+)
 async def test_forward_to_target_url__click_ip_metadata(
     client: AsyncClient,
+    session: AsyncSession,
     slug: str,
     target_url: str,
     frontend_api_key: str,
-    ip_address_public: str,
-    ip_address_public_country_code: str,
-    ip_address_private: str,
-    ip_address_malformed: str,
+    ip_headers: dict[str, str],
+    expected_ip_address: str | None,
+    expected_country_code: str | None,
 ) -> None:
-    frontend_api_key_headers = {FRONTEND_API_KEY_HEADER: frontend_api_key}
     await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
+        url=application_settings.LINKS_PREFIX,
         json={"slug": slug, "target_url": target_url},
     )
+    headers = {FRONTEND_API_KEY_HEADER: frontend_api_key} | ip_headers
 
-    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}", headers=frontend_api_key_headers)
-    await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
-        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_public},
-    )
-    await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
-        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_private},
-    )
-    await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
-        headers=frontend_api_key_headers | {CLIENT_IP_HEADER: ip_address_malformed},
-    )
-
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
+    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}", headers=headers)
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(data["items"]) == 4
-    # Clicks are returned most recent first: malformed, private, public, then no IP.
-    # Only the globally routable address (and its resolved country) is stored.
-    assert [item["ip_address"] for item in data["items"]] == [None, None, ip_address_public, None]
-    assert [item["country_code"] for item in data["items"]] == [None, None, ip_address_public_country_code, None]
+
+    click = (await session.scalars(select(Click))).one()
+    assert click.ip_address == expected_ip_address
+    assert click.country_code == expected_country_code
 
 
 @pytest.mark.usefixtures("geoip_database_unavailable")
@@ -110,36 +105,42 @@ async def test_forward_to_target_url__geoip_database_unavailable(
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
+
     assert response.status_code == status.HTTP_200_OK
-    clicks = response.json()["items"]
+
+    data = response.json()
+    clicks = data["items"]
     assert len(clicks) == 1
     assert clicks[0]["ip_address"] == ip_address_public
     assert clicks[0]["country_code"] is None
 
 
-async def test_forward_to_target_url__click_user_agent_metadata(
+@pytest.mark.usefixtures("frozen_now")
+async def test_forward_to_target_url__click_timestamp_and_user_agent_metadata(
     client: AsyncClient,
+    session: AsyncSession,
     slug: str,
     target_url: str,
     frontend_api_key: str,
     user_agent: str,
+    now: datetime,
 ) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
-    await client.get(
+
+    response = await client.get(
         url=f"{application_settings.FORWARD_PREFIX}/{slug}",
         headers={FRONTEND_API_KEY_HEADER: frontend_api_key, USER_AGENT_HEADER: user_agent},
     )
 
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert len(data["items"]) == 1
-    click = data["items"][0]
-    assert click["browser"] == "Chrome"
-    assert click["operating_system"] == "Mac OS X"
+
+    click = (await session.scalars(select(Click))).one()
+    assert click.timestamp == now
+    assert click.browser == "Chrome"
+    assert click.operating_system == "Mac OS X"
 
 
 async def test_forward_to_target_url__click_source(
@@ -167,10 +168,11 @@ async def test_forward_to_target_url__click_source(
 
     result = await session.execute(select(Click.source).order_by(Click.timestamp, Click.id))
     click_sources = list(result.scalars())
+
     assert click_sources == [ClickSource.PUBLIC_API, ClickSource.PUBLIC_API, ClickSource.LNKR_APP]
 
 
-async def test_forward_to_target_url__disabled(client: AsyncClient, slug: str, target_url: str) -> None:
+async def test_forward_to_target_url__disabled_link(client: AsyncClient, slug: str, target_url: str) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -181,33 +183,36 @@ async def test_forward_to_target_url__disabled(client: AsyncClient, slug: str, t
     )
 
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_410_GONE
+
+    data = response.json()
     error = data["detail"][0]
     assert error["type"] == "link_disabled"
 
 
-async def test_forward_to_target_url__expired(
+async def test_forward_to_target_url__expired_link(
     client: AsyncClient,
     slug: str,
     target_url: str,
-    expires_at_past: datetime,
 ) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": expires_at_past.isoformat()},
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
     )
 
-    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
+    with time_machine.travel(expires_at, tick=False):
+        response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
     assert response.status_code == status.HTTP_410_GONE
+
+    data = response.json()
     error = data["detail"][0]
     assert error["type"] == "link_expired"
 
 
-async def test_forward_to_target_url__password(
+async def test_forward_to_target_url__password_required(
     client: AsyncClient,
     slug: str,
     target_url: str,
@@ -219,10 +224,11 @@ async def test_forward_to_target_url__password(
     )
 
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
     assert response.headers["Cache-Control"] == "no-store"
+    data = response.json()
     error = data["detail"][0]
     assert error["msg"] == f"Link with slug '{slug}' requires a password"
     assert error["type"] == "link_password_required"
@@ -232,31 +238,34 @@ async def test_forward_to_target_url__password(
         url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
     )
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["items"] == []
+
+    data = response.json()
+    assert data["items"] == []
 
 
 async def test_forward_to_target_url__expired_link_with_extended_expiry(
     client: AsyncClient,
     slug: str,
     target_url: str,
-    expires_at_past: datetime,
-    expires_at_future: datetime,
 ) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": expires_at_past.isoformat()},
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
     )
 
-    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    assert response.status_code == status.HTTP_410_GONE
+    with time_machine.travel(expires_at, tick=False):
+        response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+        assert response.status_code == status.HTTP_410_GONE
 
-    await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": expires_at_future.isoformat()},
-    )
+        await client.patch(
+            url=f"{application_settings.LINKS_PREFIX}/{slug}",
+            json={"expires_at": (expires_at + timedelta(seconds=1)).isoformat()},
+        )
 
-    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-    data = response.json()
+        response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["target_url"] == target_url

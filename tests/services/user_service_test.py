@@ -5,7 +5,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -62,15 +62,17 @@ async def test_get_or_create_user_without_commit__new_user_created(session: Asyn
     assert saved_user.email == new_user_email
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_get_or_create_user_without_commit__conflict_preserves_outer_transaction(
     session: AsyncSession,
     email: str,
     user: User,
+    now: datetime,
 ) -> None:
     login_token = LoginToken(
         email=email,
         token_hash="a" * 64,
-        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+        expires_at=now + timedelta(minutes=10),
     )
     session.add(login_token)
     await session.commit()
@@ -80,14 +82,15 @@ async def test_get_or_create_user_without_commit__conflict_preserves_outer_trans
         wraps=user_service.user_database.get_user_by_email,
         side_effect=[None, mock.DEFAULT],
     )
+
     async with session.begin():
         await login_token_database.consume_login_token(session, login_token.token_hash)
+
         with mock.patch.object(user_service.user_database, "get_user_by_email", get_user_by_email):
             existing_user = await user_service.get_or_create_user_without_commit(session, UserCreate(email=email))
 
     assert get_user_by_email.await_args_list == [mock.call(session, email), mock.call(session, email)]
     assert existing_user.id == user.id
-    assert existing_user.email == email
     await session.refresh(login_token)
     assert login_token.used_at is not None
 
@@ -96,6 +99,7 @@ async def test_delete_user__user_does_not_exist(session: AsyncSession, user: Use
     user_id = user.id
     await session.delete(user)
     await session.commit()
+
     with (
         mock.patch.object(user_service.link_cache, "set_cached_links_invalidated") as set_cached_links_invalidated,
         pytest.raises(UserDoesNotExistError, match=str(user_id)),
@@ -110,19 +114,21 @@ async def test_delete_user__deletion_failure_rolls_back_without_invalidating_cac
     session: AsyncSession,
     user: User,
     link: Link,
+    now: datetime,
 ) -> None:
     user_id = user.id
     link_id = link.id
     login_token = LoginToken(
         email=user.email,
         token_hash="a" * 64,
-        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+        expires_at=now + timedelta(minutes=10),
     )
     session.add_all([link, login_token])
     await session.commit()
 
     login_token_id = login_token.id
     cache = mock.AsyncMock()
+
     with (
         mock.patch.object(
             user_service.user_database, "delete_user", mock.AsyncMock(side_effect=SQLAlchemyError("database failure"))
@@ -143,19 +149,21 @@ async def test_delete_user__commit_failure_rolls_back_without_invalidating_cache
     session: AsyncSession,
     user: User,
     link: Link,
+    now: datetime,
 ) -> None:
     user_id = user.id
     link_id = link.id
     login_token = LoginToken(
         email=user.email,
         token_hash="a" * 64,
-        expires_at=datetime.now(tz=UTC) + timedelta(minutes=10),
+        expires_at=now + timedelta(minutes=10),
     )
     session.add_all([link, login_token])
     await session.commit()
 
     login_token_id = login_token.id
     cache = mock.AsyncMock()
+
     with (
         mock.patch.object(session, "commit", mock.AsyncMock(side_effect=SQLAlchemyError("database failure"))),
         mock.patch.object(user_service.link_cache, "set_cached_links_invalidated") as set_cached_links_invalidated,
@@ -178,6 +186,7 @@ async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: U
 
     cache = mock.AsyncMock()
     set_cached_links_invalidated = mock.AsyncMock(side_effect=RedisError("cache failure"))
+
     with mock.patch.object(user_service.link_cache, "set_cached_links_invalidated", set_cached_links_invalidated):
         await user_service.delete_user(session, cache, user)
 

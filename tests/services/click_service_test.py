@@ -9,6 +9,8 @@ from datetime import UTC, date, datetime, timedelta
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+import time_machine
+
 from lnkr.models import (
     Click,
     ClickAnalyticsCountryCountRead,
@@ -25,19 +27,19 @@ from lnkr.models import (
 from lnkr.services import click_service
 
 
-async def test_list_clicks__caps_limit_and_encodes_next_cursor(link: Link) -> None:
+async def test_list_clicks__caps_limit_and_encodes_next_cursor(link: Link, now: datetime) -> None:
     session = mock.AsyncMock()
-    timestamp = datetime.now(tz=UTC)
     database_clicks = [
         Click(
             id=uuid.UUID(int=index + 1),
-            timestamp=timestamp,
+            timestamp=now,
             source=ClickSource.LNKR_APP,
             link_id=link.id,
         )
         for index in range(101)
     ]
     list_clicks_by_link = mock.AsyncMock(return_value=database_clicks)
+
     with mock.patch.object(click_service.click_database, "list_clicks_by_link", list_clicks_by_link):
         clicks, next_cursor = await click_service.list_clicks(session, link, 500, None)
 
@@ -50,6 +52,7 @@ async def test_list_clicks__last_page_has_no_cursor(link: Link) -> None:
     session = mock.AsyncMock()
     click = Click(source=ClickSource.LNKR_APP, link_id=link.id)
     list_clicks_by_link = mock.AsyncMock(return_value=[click])
+
     with mock.patch.object(click_service.click_database, "list_clicks_by_link", list_clicks_by_link):
         clicks, next_cursor = await click_service.list_clicks(session, link, 10, None)
 
@@ -61,6 +64,7 @@ async def test_list_clicks__last_page_has_no_cursor(link: Link) -> None:
 async def test_list_click_counts__empty_collection_avoids_database() -> None:
     session = mock.AsyncMock()
     count_clicks_by_links = mock.AsyncMock()
+
     with mock.patch.object(click_service.click_database, "count_clicks_by_links", count_clicks_by_links):
         click_counts = await click_service.list_click_counts(session, [])
 
@@ -71,6 +75,7 @@ async def test_list_click_counts__empty_collection_avoids_database() -> None:
 async def test_list_click_counts__fills_missing_links_with_zero(link: Link, link_other: Link) -> None:
     session = mock.AsyncMock()
     count_clicks_by_links = mock.AsyncMock(return_value={link.id: 3})
+
     with mock.patch.object(click_service.click_database, "count_clicks_by_links", count_clicks_by_links):
         click_counts = await click_service.list_click_counts(session, [link, link_other])
 
@@ -97,11 +102,9 @@ async def test_get_click_analytics__uses_four_week_local_date_period(link: Link)
     get_click_analytics_summary = mock.AsyncMock(return_value=summary)
     get_click_analytics_daily_clicks = mock.AsyncMock(return_value=daily_clicks)
     get_click_analytics_top_countries = mock.AsyncMock(return_value=top_countries)
-    # datetime.now cannot be patched directly, so replace the imported class while wrapping its real behavior.
-    datetime_mock = mock.Mock(wraps=datetime)
-    datetime_mock.now.return_value = now
+
     with (
-        mock.patch.object(click_service, "datetime", datetime_mock),
+        time_machine.travel(now, tick=False),
         mock.patch.object(click_service, "get_click_analytics_summary", get_click_analytics_summary),
         mock.patch.object(click_service, "get_click_analytics_daily_clicks", get_click_analytics_daily_clicks),
         mock.patch.object(click_service, "get_click_analytics_top_countries", get_click_analytics_top_countries),
@@ -116,11 +119,11 @@ async def test_get_click_analytics__uses_four_week_local_date_period(link: Link)
     get_click_analytics_top_countries.assert_awaited_once_with(session, link, period)
 
 
-async def test_get_click_analytics_summary__counts_total_and_last_seven_days(link: Link) -> None:
+async def test_get_click_analytics_summary__counts_total_and_last_seven_days(link: Link, now: datetime) -> None:
     session = mock.AsyncMock()
-    now = datetime(2026, 1, 1, 12, tzinfo=UTC)
     link.created_at = now - timedelta(days=30)
     count_clicks_by_periods = mock.AsyncMock(return_value=[12, 4])
+
     with mock.patch.object(click_service.click_database, "count_clicks_by_periods", count_clicks_by_periods):
         summary = await click_service.get_click_analytics_summary(session, link, now)
 
@@ -150,6 +153,7 @@ async def test_get_click_analytics_daily_clicks__fills_days_without_clicks_acros
             date(2026, 3, 30): 1,
         }
     )
+
     with mock.patch.object(click_service.click_database, "list_daily_click_counts", list_daily_click_counts):
         daily_clicks = await click_service.get_click_analytics_daily_clicks(session, link, period)
 
@@ -178,6 +182,7 @@ async def test_get_click_analytics_top_countries__calculates_known_country_perce
         timezone="UTC",
     )
     list_top_country_click_counts = mock.AsyncMock(return_value=(8, [("US", 5), ("DK", 3)]))
+
     with mock.patch.object(
         click_service.click_database, "list_top_country_click_counts", list_top_country_click_counts
     ):
@@ -200,6 +205,7 @@ async def test_get_click_analytics_top_countries__handles_no_known_countries(lin
         timezone="UTC",
     )
     list_top_country_click_counts = mock.AsyncMock(return_value=(0, []))
+
     with mock.patch.object(
         click_service.click_database, "list_top_country_click_counts", list_top_country_click_counts
     ):

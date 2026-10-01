@@ -31,6 +31,7 @@ async def test_create_initial_data__production_does_not_open_session() -> None:
 
 async def test_create_initial_data__development_creates_user_links_and_clicks(session: AsyncSession) -> None:
     email = "development@example.com"
+
     with (
         mock.patch.object(application_settings, "ENVIRONMENT", ApplicationEnvironment.DEVELOPMENT),
         mock.patch.object(application_settings, "DEVELOPMENT_USER_EMAIL", email),
@@ -39,6 +40,7 @@ async def test_create_initial_data__development_creates_user_links_and_clicks(se
         await initial_data.create_initial_data()
 
     user = await session.scalar(select(User).where(User.email == email))
+
     assert user is not None
     assert await session.scalar(select(Link).where(Link.user_id == user.id)) is not None
     assert await session.scalar(select(Click).join(Link).where(Link.user_id == user.id)) is not None

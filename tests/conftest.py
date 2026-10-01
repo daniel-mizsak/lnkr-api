@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
+import time_machine
 from geoip2.errors import AddressNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
@@ -21,7 +22,7 @@ from lnkr.models import Link, LinkCache, LinkStatus, User
 from lnkr.models.base import Base
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Iterator
 
     from geoip2.database import Reader
     from sqlalchemy.ext.asyncio import AsyncEngine
@@ -99,26 +100,30 @@ def target_url_invalid_fixture() -> str:
 
 
 @pytest.fixture(name="link")
-def link_fixture(user: User, slug: str, target_url: str) -> Link:
+def link_fixture(user: User, slug: str, target_url: str, now: datetime) -> Link:
     return Link(
         id=uuid.uuid4(),
         slug=slug,
         target_url=target_url,
         status=LinkStatus.ACTIVE,
         favorite=False,
+        created_at=now,
+        updated_at=now,
         user=user,
         user_id=user.id,
     )
 
 
 @pytest.fixture(name="link_other")
-def link_other_fixture(user: User, slug_other: str, target_url: str) -> Link:
+def link_other_fixture(user: User, slug_other: str, target_url: str, now: datetime) -> Link:
     return Link(
         id=uuid.uuid4(),
         slug=slug_other,
         target_url=target_url,
         status=LinkStatus.ACTIVE,
         favorite=False,
+        created_at=now,
+        updated_at=now,
         user=user,
         user_id=user.id,
     )
@@ -134,14 +139,20 @@ def password_fixture() -> str:
     return "password"
 
 
-@pytest.fixture(name="expires_at_future")
-def expires_at_future_fixture() -> datetime:
-    return datetime.now(UTC) + timedelta(days=1)
+@pytest.fixture(name="now")
+def now_fixture() -> datetime:
+    return datetime(2026, 1, 1, tzinfo=UTC)
 
 
-@pytest.fixture(name="expires_at_past")
-def expires_at_past_fixture() -> datetime:
-    return datetime.now(UTC) - timedelta(days=1)
+@pytest.fixture(name="frozen_now")
+def frozen_now_fixture(now: datetime) -> Iterator[None]:
+    with time_machine.travel(now, tick=False):
+        yield
+
+
+@pytest.fixture(name="expires_at")
+def expires_at_fixture(now: datetime) -> datetime:
+    return now + timedelta(days=1)
 
 
 @pytest.fixture(name="frontend_api_key")

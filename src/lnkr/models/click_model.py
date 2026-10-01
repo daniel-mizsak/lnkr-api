@@ -118,7 +118,6 @@ class Click(Base):
         default=lambda: datetime.now(tz=UTC),
         nullable=False,
     )
-    # TODO: Make sure source is added to existing records.
     source: Mapped[ClickSource] = mapped_column(Enum(ClickSource, name="click_source"), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(IP_ADDRESS_MAX_LENGTH), nullable=True)
     country_code: Mapped[str | None] = mapped_column(String(COUNTRY_CODE_LENGTH), nullable=True)

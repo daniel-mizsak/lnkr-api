@@ -11,9 +11,12 @@
 
 ## Testing
 
-- When implementing new features, do not add tests until explicitly asked.
-- Name tests `test_<operation>__<scenario_or_behavior>` and follow the wording established in neighboring tests. Describe the scenario or observable behavior, and reuse existing terms for equivalent cases.
-- Parametrize tests when cases share the same setup and assertions without conditional test logic; use separate tests when cases need different setup or patch targets.
-- Run tests with `just test`. Docker must be running (testcontainers); the recipe sources `deployment/.env.common` and `.env.development`, so do not run bare `uv run pytest`.
-- Run lint with `just lint` and type checks with `just type`.
-- `just check-all` must pass before finishing any change. Runs lint, type checks, and tests; requires 100% test-code coverage and reports application coverage.
+- Add tests for new features only when asked.
+- Name tests `test_<operation>__<scenario_or_behavior>`, using neighboring terminology. Keep one scenario per test; multiple actions are appropriate when testing a sequence.
+- Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
+- Separate Arrange, Act, Assert; store results before asserting (`pytest.raises` is an exception); omit routine section comments.
+- Assert scenario-specific outcomes without duplicating other tests; retain checks needed to prove state transitions. Use dictionary equality for long JSON contracts; for short responses, assign `data = response.json()` before individual assertions or extracting `error`. Preserve endpoint status, authorization, and response-contract checks; assert status before reading the body.
+- Set up endpoint tests through APIs; write directly to the database only for otherwise unreachable states. Database reads may verify side effects.
+- Use fixed `now` for ordinary time data. Opt into `@pytest.mark.usefixtures("frozen_now")` when code reads the current time; use local `time_machine.travel(..., tick=False)` contexts for boundaries or time changes. Fixtures needing frozen setup must depend on `frozen_now`.
+- Use `just test` with Docker running; bare `uv run pytest` skips required environment setup.
+- Before finishing, pass `just check-all` (lint, types, tests, 100% test-code coverage).

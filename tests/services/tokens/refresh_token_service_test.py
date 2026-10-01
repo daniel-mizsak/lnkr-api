@@ -5,7 +5,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -22,17 +22,18 @@ if TYPE_CHECKING:
     from lnkr.models import User
 
 
-async def test_rotate_refresh_token__user_does_not_exist(session: AsyncSession, user: User) -> None:
+async def test_rotate_refresh_token__user_does_not_exist(session: AsyncSession, user: User, now: datetime) -> None:
     refresh_token_value = "refresh-token"  # noqa: S105
     refresh_token = RefreshToken(
         user_id=user.id,
         token_hash=hashlib.sha256(refresh_token_value.encode()).hexdigest(),
-        expires_at=datetime.now(tz=UTC) + timedelta(days=1),
+        expires_at=now + timedelta(days=1),
     )
     session.add(refresh_token)
     await session.commit()
 
     get_user_by_id_for_update = mock.AsyncMock(return_value=None)
+
     with (
         mock.patch.object(refresh_token_service.user_database, "get_user_by_id_for_update", get_user_by_id_for_update),
         pytest.raises(RefreshTokenInvalidError),
@@ -40,25 +41,28 @@ async def test_rotate_refresh_token__user_does_not_exist(session: AsyncSession, 
         await refresh_token_service.rotate_refresh_token(session, refresh_token_value)
 
     await session.refresh(refresh_token)
+
     assert refresh_token.used_at is None
     assert list((await session.scalars(select(RefreshToken.id))).all()) == [refresh_token.id]
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_rotate_refresh_token__replacement_failure_preserves_original_token(
     session: AsyncSession,
     user: User,
+    now: datetime,
 ) -> None:
     refresh_token_value = "refresh-token"  # noqa: S105
     replacement_token_value = "replacement-refresh-token"  # noqa: S105
     refresh_token = RefreshToken(
         user_id=user.id,
         token_hash=hashlib.sha256(refresh_token_value.encode()).hexdigest(),
-        expires_at=datetime.now(tz=UTC) + timedelta(days=1),
+        expires_at=now + timedelta(days=1),
     )
     replacement_token = RefreshToken(
         user_id=user.id,
         token_hash=hashlib.sha256(replacement_token_value.encode()).hexdigest(),
-        expires_at=datetime.now(tz=UTC) + timedelta(days=1),
+        expires_at=now + timedelta(days=1),
     )
     session.add_all([refresh_token, replacement_token])
     await session.commit()
@@ -81,9 +85,11 @@ async def test_rotate_refresh_token__replacement_failure_preserves_original_toke
     await refresh_token_service.rotate_refresh_token(session, refresh_token_value)
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_rotate_refresh_token__original_consumed_and_replacement_consumable(
     session: AsyncSession,
     user: User,
+    now: datetime,
 ) -> None:
     # Preserve the id because the expected rollback below expires ORM attributes.
     user_id = user.id
@@ -92,7 +98,7 @@ async def test_rotate_refresh_token__original_consumed_and_replacement_consumabl
         RefreshToken(
             user_id=user_id,
             token_hash=hashlib.sha256(original_token_value.encode()).hexdigest(),
-            expires_at=datetime.now(tz=UTC) + timedelta(days=1),
+            expires_at=now + timedelta(days=1),
         ),
     )
     await session.commit()
@@ -102,8 +108,6 @@ async def test_rotate_refresh_token__original_consumed_and_replacement_consumabl
         original_token_value,
     )
 
-    assert rotated_user_id == user_id
-    assert replacement_token_value != original_token_value
     with pytest.raises(RefreshTokenInvalidError):
         await refresh_token_service.rotate_refresh_token(session, original_token_value)
 
@@ -112,5 +116,7 @@ async def test_rotate_refresh_token__original_consumed_and_replacement_consumabl
         replacement_token_value,
     )
 
+    assert rotated_user_id == user_id
+    assert replacement_token_value != original_token_value
     assert second_rotated_user_id == user_id
     assert second_replacement_token_value != replacement_token_value

@@ -32,7 +32,10 @@ async def test_get_click_analytics__slug_does_not_exist(client: AsyncClient, slu
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/analytics")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"][0]["type"] == "slug_does_not_exist"
+
+    data = response.json()
+    error = data["detail"][0]
+    assert error["type"] == "slug_does_not_exist"
 
 
 async def test_get_click_analytics__slug_not_owned_by_user(client: AsyncClient, slug: str) -> None:
@@ -44,7 +47,9 @@ async def test_get_click_analytics__slug_not_owned_by_user(client: AsyncClient, 
         response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/analytics")
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["type"] == "slug_not_owned_by_user"
@@ -63,7 +68,9 @@ async def test_get_click_analytics__invalid_timezone(client: AsyncClient, slug: 
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == timezone
     assert error["loc"] == ["query", "timezone"]
     assert error["type"] == "timezone_invalid"
@@ -99,6 +106,7 @@ async def test_get_click_analytics__response_and_timezone(client: AsyncClient, s
         ),
     )
     get_click_analytics = mock.AsyncMock(return_value=analytics)
+
     with mock.patch.object(click_route, "get_click_analytics", get_click_analytics):
         response = await client.get(
             url=f"{application_settings.LINKS_PREFIX}/{slug}/analytics",

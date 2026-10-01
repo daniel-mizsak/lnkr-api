@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
+import time_machine
 from redis.exceptions import RedisError
 
 from lnkr.config.application_settings import application_settings
@@ -100,13 +101,15 @@ async def test_generate_unused_random_slug__retries_with_increasing_length(
     await session.commit()
 
     generate_random_slug = mock.Mock(side_effect=[link.slug, slug_other])
-    with mock.patch.object(link_service, "_generate_random_slug", generate_random_slug):
-        assert await link_service.generate_unused_random_slug(session) == slug_other
 
+    with mock.patch.object(link_service, "_generate_random_slug", generate_random_slug):
+        generated_slug = await link_service.generate_unused_random_slug(session)
+
+    assert generated_slug == slug_other
     assert generate_random_slug.call_args_list == [mock.call(6), mock.call(7)]
 
 
-async def test_generate_unused_random_slug__exhaustion_raises_domain_error(session: AsyncSession, link: Link) -> None:
+async def test_generate_unused_random_slug__generation_attempts_exhausted(session: AsyncSession, link: Link) -> None:
     session.add(link)
     await session.commit()
 
@@ -119,6 +122,7 @@ async def test_generate_unused_random_slug__exhaustion_raises_domain_error(sessi
 
 async def test_get_cached_link__cache_hit_avoids_database(cached_link: LinkCache) -> None:
     get_link = mock.AsyncMock()
+
     with (
         mock.patch.object(
             link_service.link_cache,
@@ -127,49 +131,41 @@ async def test_get_cached_link__cache_hit_avoids_database(cached_link: LinkCache
         ),
         mock.patch.object(link_service, "_get_link", get_link),
     ):
-        assert await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), cached_link.slug) is cached_link
+        retrieved_link = await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), cached_link.slug)
 
+    assert retrieved_link is cached_link
     get_link.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "cache_error",
+    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
+)
 async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
-    session: AsyncSession, link: Link
+    session: AsyncSession,
+    link: Link,
+    cache_error: RedisError | None,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    get_cached_link_by_slug = mock.AsyncMock(return_value=None)
+    get_cached_link_by_slug = mock.AsyncMock(return_value=None, side_effect=cache_error)
     add_cached_link = mock.AsyncMock()
+
     with (
         mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link_by_slug),
         mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
     ):
-        result = await link_service.get_cached_link(session, cache, link.slug)
+        retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
 
-    assert result == LinkCache.from_link(link)
-    add_cached_link.assert_awaited_once_with(cache, result)
-
-
-async def test_get_cached_link__cache_read_failure_treated_as_miss(session: AsyncSession, link: Link) -> None:
-    session.add(link)
-    await session.commit()
-
-    cache = mock.AsyncMock()
-    get_cached_link_by_slug = mock.AsyncMock(side_effect=RedisError())
-    add_cached_link = mock.AsyncMock()
-    with (
-        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link_by_slug),
-        mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
-    ):
-        result = await link_service.get_cached_link(session, cache, link.slug)
-
-    assert result == LinkCache.from_link(link)
-    add_cached_link.assert_awaited_once_with(cache, result)
+    assert retrieved_link == LinkCache.from_link(link)
+    add_cached_link.assert_awaited_once_with(cache, retrieved_link)
 
 
-async def test_get_cached_link__disabled_link_raises_domain_error(cached_link: LinkCache) -> None:
+async def test_get_cached_link__disabled_link(cached_link: LinkCache) -> None:
     disabled_link = cached_link.model_copy(update={"status": LinkStatus.DISABLED})
+
     with (
         mock.patch.object(
             link_service.link_cache,
@@ -181,23 +177,42 @@ async def test_get_cached_link__disabled_link_raises_domain_error(cached_link: L
         await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), disabled_link.slug)
 
 
-async def test_get_cached_link__expired_link_raises_domain_error(cached_link: LinkCache) -> None:
-    expired_link = cached_link.model_copy(
-        update={"expires_at": datetime.now(tz=UTC) - timedelta(seconds=1)},
-    )
+@pytest.mark.parametrize(
+    "elapsed",
+    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
+)
+async def test_get_cached_link__expired_link(cached_link: LinkCache, elapsed: timedelta) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    expired_link = cached_link.model_copy(update={"expires_at": expires_at})
+
     with (
+        time_machine.travel(expires_at + elapsed, tick=False),
         mock.patch.object(
-            link_service.link_cache,
-            "get_cached_link_by_slug",
-            mock.AsyncMock(return_value=expired_link),
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=expired_link)
         ),
         pytest.raises(LinkExpiredError),
     ):
         await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), expired_link.slug)
 
 
-async def test_get_cached_link_validate_password__rejects_invalid_password(cached_link: LinkCache) -> None:
+async def test_get_cached_link__immediately_before_expiration(cached_link: LinkCache) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    expiring_link = cached_link.model_copy(update={"expires_at": expires_at})
+
+    with (
+        time_machine.travel(expires_at - timedelta(microseconds=1), tick=False),
+        mock.patch.object(
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=expiring_link)
+        ),
+    ):
+        retrieved_link = await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), expiring_link.slug)
+
+    assert retrieved_link is expiring_link
+
+
+async def test_get_cached_link_validate_password__invalid_password(cached_link: LinkCache) -> None:
     protected_link = cached_link.model_copy(update={"password_hash": "hash"})
+
     with (
         mock.patch.object(link_service, "get_cached_link", mock.AsyncMock(return_value=protected_link)),
         mock.patch.object(link_service, "_verify_password", mock.AsyncMock(return_value=False)),
@@ -211,52 +226,62 @@ async def test_get_cached_link_validate_password__rejects_invalid_password(cache
         )
 
 
-async def test_get_link_validate_user__ownership_validated(
+async def test_get_link_validate_user__slug_owned_by_current_user(
     session: AsyncSession,
     link: Link,
     user: User,
+) -> None:
+    session.add(link)
+    await session.commit()
+
+    owned_link = await link_service.get_link_validate_user(session, link.slug, user)
+
+    assert owned_link is link
+
+
+async def test_get_link_validate_user__slug_not_owned_by_user(
+    session: AsyncSession,
+    link: Link,
     user_other: User,
 ) -> None:
     session.add(link)
     await session.commit()
 
-    assert await link_service.get_link_validate_user(session, link.slug, user) is link
-
     with pytest.raises(SlugNotOwnedByUserError):
         await link_service.get_link_validate_user(session, link.slug, user_other)
 
 
-async def test_get_link_validate_user__slug_does_not_exist(session: AsyncSession, user: User, slug: str) -> None:
+async def test_get_link_validate_user__slug_does_not_exist(
+    session: AsyncSession,
+    user: User,
+    slug: str,
+    link_other: Link,
+) -> None:
+    session.add(link_other)
+    await session.commit()
+
     with pytest.raises(SlugDoesNotExistError):
         await link_service.get_link_validate_user(session, slug, user)
 
 
-async def test_update_link__cache_invalidated(session: AsyncSession, link: Link, user: User, target_url: str) -> None:
-    session.add(link)
-    await session.commit()
-
-    cache = mock.AsyncMock()
-    set_cached_link_invalidated = mock.AsyncMock()
-    link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
-    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
-        updated_link = await link_service.update_link(session, cache, link.slug, link_update, user)
-
-    assert updated_link.target_url == f"{target_url}/updated"
-    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
-
-
-async def test_update_link__cache_failure_ignored(
+@pytest.mark.parametrize(
+    "cache_error",
+    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
+)
+async def test_update_link__cache_invalidation_attempted(
     session: AsyncSession,
     link: Link,
     user: User,
     target_url: str,
+    cache_error: RedisError | None,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    set_cached_link_invalidated = mock.AsyncMock(side_effect=RedisError())
+    set_cached_link_invalidated = mock.AsyncMock(side_effect=cache_error)
     link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
+
     with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
         updated_link = await link_service.update_link(session, cache, link.slug, link_update, user)
 
@@ -264,25 +289,22 @@ async def test_update_link__cache_failure_ignored(
     set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
 
 
-async def test_delete_link__cache_invalidated(session: AsyncSession, link: Link, user: User) -> None:
+@pytest.mark.parametrize(
+    "cache_error",
+    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
+)
+async def test_delete_link__cache_invalidation_attempted(
+    session: AsyncSession,
+    link: Link,
+    user: User,
+    cache_error: RedisError | None,
+) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    set_cached_link_invalidated = mock.AsyncMock()
-    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
-        await link_service.delete_link(session, cache, link.slug, user)
+    set_cached_link_invalidated = mock.AsyncMock(side_effect=cache_error)
 
-    assert await link_service.link_database.get_link_by_slug(session, link.slug) is None
-    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
-
-
-async def test_delete_link__cache_failure_ignored(session: AsyncSession, link: Link, user: User) -> None:
-    session.add(link)
-    await session.commit()
-
-    cache = mock.AsyncMock()
-    set_cached_link_invalidated = mock.AsyncMock(side_effect=RedisError())
     with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
         await link_service.delete_link(session, cache, link.slug, user)
 
@@ -294,8 +316,9 @@ async def test_list_links__normalizes_search_and_caps_page_size(user: User) -> N
     session = mock.AsyncMock()
     list_links_by_user = mock.AsyncMock(return_value=([], 0))
     favorites_only = False
+
     with mock.patch.object(link_service.link_database, "list_links_by_user", list_links_by_user):
-        assert await link_service.list_links(
+        links, total = await link_service.list_links(
             session,
             user,
             "  search  ",
@@ -304,8 +327,10 @@ async def test_list_links__normalizes_search_and_caps_page_size(user: User) -> N
             "descending",
             500,
             2,
-        ) == ([], 0)
+        )
 
+    assert links == []
+    assert total == 0
     list_links_by_user.assert_awaited_once_with(
         session,
         user,

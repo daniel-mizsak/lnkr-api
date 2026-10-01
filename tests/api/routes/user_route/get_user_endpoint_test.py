@@ -16,9 +16,10 @@ if TYPE_CHECKING:
 
 async def test_get_user__authenticated_user(client: AsyncClient) -> None:
     response = await client.get(url=f"{application_settings.USER_PREFIX}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert set(data.keys()) == {"email", "status"}
     assert data["email"] == "user@example.com"
     assert data["status"] == "regular"

@@ -4,7 +4,6 @@ Tests for the create link endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -17,6 +16,8 @@ from lnkr.exceptions import SlugAlreadyExistsError, UserDoesNotExistError, UserL
 from lnkr.models.link_model import TARGET_URL_MAX_LENGTH
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from httpx2 import AsyncClient
 
     from lnkr.models import User
@@ -43,7 +44,9 @@ async def test_create_link__invalid_slug(
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == invalid_slug
     assert error["loc"] == ["body", "slug"]
     assert error["msg"] == expected_message
@@ -61,7 +64,9 @@ async def test_create_link__invalid_target_url(
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == target_url_invalid
     assert error["loc"] == ["body", "target_url"]
     assert error["msg"] == "Input should be a valid URL, relative URL without a base"
@@ -81,7 +86,9 @@ async def test_create_link__target_url_too_long(
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == target_url_too_long
     assert error["loc"] == ["body", "target_url"]
     assert error["msg"] == (
@@ -96,6 +103,7 @@ async def test_create_link__slug_already_exists(
     target_url: str,
 ) -> None:
     create_link = mock.AsyncMock(side_effect=SlugAlreadyExistsError(slug))
+
     with mock.patch.object(link_route, "create_link", create_link):
         response = await client.post(
             url=f"{application_settings.LINKS_PREFIX}",
@@ -103,7 +111,9 @@ async def test_create_link__slug_already_exists(
         )
 
     assert response.status_code == status.HTTP_409_CONFLICT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["body", "slug"]
     assert error["msg"] == f"Slug '{slug}' already exists"
@@ -118,6 +128,7 @@ async def test_create_link__user_does_not_exist(
     target_url: str,
 ) -> None:
     create_link = mock.AsyncMock(side_effect=UserDoesNotExistError.by_id(user.id))
+
     with mock.patch.object(link_route, "create_link", create_link):
         response = await client.post(
             url=f"{application_settings.LINKS_PREFIX}",
@@ -125,7 +136,9 @@ async def test_create_link__user_does_not_exist(
         )
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["msg"] == f"User with id '{user.id}' does not exist"
     assert error["type"] == "user_does_not_exist"
     create_link.assert_awaited_once()
@@ -140,6 +153,7 @@ async def test_create_link__user_link_limit_exceeded(
     create_link = mock.AsyncMock(
         side_effect=UserLinkLimitExceededError(user.email, application_settings.USER_LINK_LIMIT),
     )
+
     with mock.patch.object(link_route, "create_link", create_link):
         response = await client.post(
             url=f"{application_settings.LINKS_PREFIX}",
@@ -147,7 +161,9 @@ async def test_create_link__user_link_limit_exceeded(
         )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["msg"] == f"User '{user.email}' exceeds their link limit of {application_settings.USER_LINK_LIMIT}"
     assert error["type"] == "user_link_limit_exceeded"
     create_link.assert_awaited_once()
@@ -164,48 +180,42 @@ async def test_create_link__unknown_field(
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["loc"] == ["body", "unknown"]
     assert error["msg"] == "Extra inputs are not permitted"
     assert error["type"] == "extra_forbidden"
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_create_link__expiration_and_password(
     client: AsyncClient,
     slug: str,
     target_url: str,
-    expires_at_future: datetime,
+    expires_at: datetime,
     password: str,
+    now: datetime,
 ) -> None:
     response = await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={
             "slug": slug,
             "target_url": target_url,
-            "expires_at": expires_at_future.isoformat(),
+            "expires_at": expires_at.isoformat(),
             "password": password,
         },
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_201_CREATED
-    assert set(data) == {
-        "slug",
-        "target_url",
-        "status",
-        "favorite",
-        "expires_at",
-        "password_protected",
-        "created_at",
-        "updated_at",
-    }
-    assert data["slug"] == slug
-    assert data["target_url"] == target_url
-    assert data["status"] == "active"
-    assert data["favorite"] is False
-    assert datetime.fromisoformat(data["expires_at"]) == expires_at_future
-    assert data["password_protected"] is True
 
-    now = datetime.now(UTC)
-    assert now - timedelta(seconds=5) <= datetime.fromisoformat(data["created_at"]) <= now
-    assert now - timedelta(seconds=5) <= datetime.fromisoformat(data["updated_at"]) <= now
+    assert response.json() == {
+        "slug": slug,
+        "target_url": target_url,
+        "status": "active",
+        "favorite": False,
+        "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
+        "password_protected": True,
+        "created_at": now.isoformat().replace("+00:00", "Z"),
+        "updated_at": now.isoformat().replace("+00:00", "Z"),
+    }

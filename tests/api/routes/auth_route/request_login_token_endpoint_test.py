@@ -28,9 +28,10 @@ async def test_request_login_token__missing_frontend_api_key(client: AsyncClient
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/request-login-token",
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    data = response.json()
     error = data["detail"][0]
     assert error["msg"] == "The provided frontend api key is invalid"
     assert error["type"] == "frontend_api_key_invalid"
@@ -42,6 +43,7 @@ async def test_request_login_token__login_token_generation_failure(
     email: str,
 ) -> None:
     create_and_save_login_token = mock.AsyncMock(side_effect=LoginTokenGenerationError())
+
     with mock.patch.object(auth_route, "create_and_save_login_token", create_and_save_login_token):
         response = await client.post(
             url=f"{application_settings.AUTH_PREFIX}/request-login-token",
@@ -49,7 +51,9 @@ async def test_request_login_token__login_token_generation_failure(
         )
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["msg"] == "Unable to generate a login token. Please try again."
     assert error["type"] == "login_token_generation_failed"
     create_and_save_login_token.assert_awaited_once()
@@ -67,6 +71,7 @@ async def test_request_login_token__missing_request_metadata(
         json={"email": email},
         headers={USER_AGENT_HEADER: user_agent_unrecognized},
     )
+
     mock_send_email.assert_awaited_once()
 
     await_args = mock_send_email.await_args
@@ -96,6 +101,7 @@ async def test_request_login_token__complete_request_metadata(
         json={"email": email},
         headers={CLIENT_IP_HEADER: ip_address_public, USER_AGENT_HEADER: user_agent},
     )
+
     mock_send_email.assert_awaited_once()
 
     await_args = mock_send_email.await_args
@@ -139,6 +145,7 @@ async def test_request_login_token__geoip_database_unavailable(
         json={"email": email},
         headers={CLIENT_IP_HEADER: ip_address_public},
     )
+
     mock_send_email.assert_awaited_once()
 
     await_args = mock_send_email.await_args

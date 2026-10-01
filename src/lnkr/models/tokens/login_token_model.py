@@ -39,7 +39,6 @@ class LoginTokenVerify(BaseModel):
     login_token_value: str
 
 
-# TODO: Remove old login tokens with a scheduled cleanup task.
 class LoginToken(Base):
     """Login token model saved in the database."""
 

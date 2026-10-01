@@ -20,9 +20,10 @@ if TYPE_CHECKING:
 
 async def test_delete_link__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
     response = await client.delete(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -43,10 +44,12 @@ async def test_delete_link__slug_not_owned_by_user(
     )
 
     override_get_current_user(user_other)
+
     response = await client.delete(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -64,15 +67,8 @@ async def test_delete_link__slug_owned_by_current_user(client: AsyncClient, slug
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
-
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    error = data["detail"][0]
-    assert error["input"] == slug
-    assert error["loc"] == ["path", "slug"]
-    assert error["msg"] == f"Slug '{slug}' does not exist"
-    assert error["type"] == "slug_does_not_exist"
+    deleted_link_response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
+    assert deleted_link_response.status_code == status.HTTP_404_NOT_FOUND
 
 
 async def test_delete_link__slug_reused_after_deletion(
@@ -95,9 +91,9 @@ async def test_delete_link__slug_reused_after_deletion(
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
-
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert len(data["items"]) == 2
 
     await client.delete(url=f"{application_settings.LINKS_PREFIX}/{slug}")
@@ -107,7 +103,8 @@ async def test_delete_link__slug_reused_after_deletion(
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert len(data["items"]) == 0

@@ -16,6 +16,7 @@ from lnkr.services import email_service
 async def test_send_email__offloads_blocking_smtp_call() -> None:
     message = MIMEMultipart()
     run_sync = mock.AsyncMock()
+
     with mock.patch.object(email_service.to_thread, "run_sync", run_sync):
         await email_service.send_email(message)
 
@@ -36,6 +37,7 @@ def test_send_email_sync__uses_environment_specific_smtp_client(
     message = MIMEMultipart()
     smtp_client = mock.MagicMock()
     smtp_server = smtp_client.return_value.__enter__.return_value
+
     with (
         mock.patch.object(application_settings, "ENVIRONMENT", environment),
         mock.patch.object(email_service.smtplib, smtp_client_name, smtp_client),

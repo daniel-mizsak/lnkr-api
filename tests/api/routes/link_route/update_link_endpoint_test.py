@@ -4,9 +4,11 @@ Tests for the update link endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+import pytest
+import time_machine
 from fastapi import status
 
 from lnkr.config.application_settings import application_settings
@@ -23,9 +25,10 @@ async def test_update_link__invalid_target_url(client: AsyncClient, slug: str, t
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": target_url_invalid},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == target_url_invalid
     assert error["loc"] == ["body", "target_url"]
@@ -38,9 +41,10 @@ async def test_update_link__slug_does_not_exist(client: AsyncClient, slug: str, 
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": target_url},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -61,13 +65,15 @@ async def test_update_link__slug_not_owned_by_user(
     )
 
     override_get_current_user(user_other)
+
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": f"{target_url}/1"},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -85,9 +91,10 @@ async def test_update_link__unknown_field(client: AsyncClient, slug: str, target
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"taget_url": target_url},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
     error = data["detail"][0]
     assert error["loc"] == ["body", "taget_url"]
     assert error["type"] == "extra_forbidden"
@@ -103,9 +110,10 @@ async def test_update_link__empty_body(client: AsyncClient, slug: str, target_ur
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == {}
     assert error["loc"] == ["body"]
@@ -113,7 +121,7 @@ async def test_update_link__empty_body(client: AsyncClient, slug: str, target_ur
     assert error["type"] == "value_error"
 
 
-async def test_update_link__target_url(client: AsyncClient, slug: str, target_url: str) -> None:
+async def test_update_link__target_url_changed(client: AsyncClient, slug: str, target_url: str) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": f"{target_url}/1"},
@@ -123,127 +131,19 @@ async def test_update_link__target_url(client: AsyncClient, slug: str, target_ur
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"target_url": target_url},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["target_url"] == target_url
 
 
-async def test_update_link__null_target_url(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"target_url": None},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = data["detail"][0]
-    assert error["input"] == {"target_url": None}
-    assert error["loc"] == ["body"]
-    assert error["msg"] == "Value error, target_url cannot be cleared"
-    assert error["type"] == "value_error"
-
-
-async def test_update_link__status(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"status": "disabled"},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["status"] == "disabled"
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"status": "active"},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["status"] == "active"
-
-
-async def test_update_link__null_status(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"status": None},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = data["detail"][0]
-    assert error["input"] == {"status": None}
-    assert error["loc"] == ["body"]
-    assert error["msg"] == "Value error, status cannot be cleared"
-    assert error["type"] == "value_error"
-
-
-async def test_update_link__favorite(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"favorite": True},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["favorite"] is True
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"favorite": False},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["favorite"] is False
-
-
-async def test_update_link__null_favorite(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"favorite": None},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = data["detail"][0]
-    assert error["input"] == {"favorite": None}
-    assert error["loc"] == ["body"]
-    assert error["msg"] == "Value error, favorite cannot be cleared"
-    assert error["type"] == "value_error"
-
-
-async def test_update_link__expires_at(
+@pytest.mark.parametrize("field", ["target_url", "status", "favorite"])
+async def test_update_link__non_nullable_field_cleared(
     client: AsyncClient,
     slug: str,
     target_url: str,
-    expires_at_future: datetime,
+    field: str,
 ) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
@@ -252,24 +152,120 @@ async def test_update_link__expires_at(
 
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": expires_at_future.isoformat()},
+        json={field: None},
     )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
     data = response.json()
+    error = data["detail"][0]
+    assert error["input"] == {field: None}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == f"Value error, {field} cannot be cleared"
+    assert error["type"] == "value_error"
+
+
+@pytest.mark.parametrize(("original_value", "updated_value"), [("active", "disabled"), ("disabled", "active")])
+async def test_update_link__status_changed(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    original_value: str,
+    updated_value: str,
+) -> None:
+    await client.post(
+        url=application_settings.LINKS_PREFIX,
+        json={"slug": slug, "target_url": target_url},
+    )
+    await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": original_value},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": updated_value},
+    )
 
     assert response.status_code == status.HTTP_200_OK
-    assert datetime.fromisoformat(data["expires_at"]) == expires_at_future
+
+    data = response.json()
+    assert data["status"] == updated_value
+
+
+@pytest.mark.parametrize(("original_value", "updated_value"), [(False, True), (True, False)])
+async def test_update_link__favorite_changed(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    original_value: bool,
+    updated_value: bool,
+) -> None:
+    await client.post(
+        url=application_settings.LINKS_PREFIX,
+        json={"slug": slug, "target_url": target_url},
+    )
+    await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"favorite": original_value},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"favorite": updated_value},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert data["favorite"] == updated_value
+
+
+async def test_update_link__expiration_set(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    expires_at: datetime,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": expires_at.isoformat()},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert datetime.fromisoformat(data["expires_at"]) == expires_at
+
+
+async def test_update_link__expiration_cleared(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    expires_at: datetime,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
+    )
 
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"expires_at": None},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["expires_at"] is None
 
 
-async def test_update_link__expires_at_aware_datetime(client: AsyncClient, slug: str, target_url: str) -> None:
+async def test_update_link__timezone_required(client: AsyncClient, slug: str, target_url: str) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
@@ -279,105 +275,117 @@ async def test_update_link__expires_at_aware_datetime(client: AsyncClient, slug:
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"expires_at": "2026-12-31T12:00:00"},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
     error = data["detail"][0]
     assert error["loc"] == ["body", "expires_at"]
     assert error["msg"] == "Input should have timezone info"
     assert error["type"] == "timezone_aware"
 
 
-async def test_update_link__password(client: AsyncClient, slug: str, target_url: str, password: str) -> None:
+@pytest.mark.parametrize(
+    ("original_password", "updated_password", "password_protected"),
+    [
+        pytest.param(None, "password", True, id="set"),
+        pytest.param("password", None, False, id="clear"),
+    ],
+)
+async def test_update_link__password_protection_changed(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    original_password: str | None,
+    updated_password: str | None,
+    password_protected: bool,
+) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
+        json={"slug": slug, "target_url": target_url, "password": original_password},
     )
 
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"password": password},
+        json={"password": updated_password},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert data["password_protected"] is True
 
-    # Change password
+    data = response.json()
+    assert data["password_protected"] is password_protected
+
+
+async def test_update_link__password_replaced(client: AsyncClient, slug: str, target_url: str, password: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "password": password},
+    )
+
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
         json={"password": f"new-{password}"},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["password_protected"] is True
 
-    response = await client.post(
+    old_password_response = await client.post(
         url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": password},
     )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-    response = await client.post(
+    new_password_response = await client.post(
         url=f"{application_settings.FORWARD_PREFIX}/{slug}/unlock",
         json={"password": f"new-{password}"},
     )
-    data = response.json()
+    assert old_password_response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert new_password_response.status_code == status.HTTP_200_OK
 
-    assert response.status_code == status.HTTP_200_OK
+    data = new_password_response.json()
     assert data["target_url"] == target_url
 
-    # Clear password
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"password": None},
-    )
-    data = response.json()
+
+async def test_update_link__created_at_preserved(client: AsyncClient, slug: str, target_url: str) -> None:
+    created_at = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    updated_at = created_at + timedelta(minutes=1)
+
+    with time_machine.travel(created_at, tick=False) as traveller:
+        await client.post(
+            url=f"{application_settings.LINKS_PREFIX}",
+            json={"slug": slug, "target_url": target_url},
+        )
+        traveller.move_to(updated_at)
+
+        response = await client.patch(
+            url=f"{application_settings.LINKS_PREFIX}/{slug}",
+            json={"target_url": f"{target_url}/1"},
+        )
 
     assert response.status_code == status.HTTP_200_OK
-    assert data["password_protected"] is False
 
-
-async def test_update_link__created_at(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-) -> None:
-    response = await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
     data = response.json()
-    original_created_at = data["created_at"]
+    assert datetime.fromisoformat(data["created_at"]) == created_at
 
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"target_url": f"{target_url}/1"},
-    )
-    data = response.json()
+
+async def test_update_link__updated_at_advanced(client: AsyncClient, slug: str, target_url: str) -> None:
+    created_at = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    updated_at = created_at + timedelta(minutes=1)
+
+    with time_machine.travel(created_at, tick=False) as traveller:
+        await client.post(
+            url=f"{application_settings.LINKS_PREFIX}",
+            json={"slug": slug, "target_url": target_url},
+        )
+        traveller.move_to(updated_at)
+
+        response = await client.patch(
+            url=f"{application_settings.LINKS_PREFIX}/{slug}",
+            json={"target_url": f"{target_url}/1"},
+        )
 
     assert response.status_code == status.HTTP_200_OK
-    assert data["created_at"] == original_created_at
 
-
-async def test_update_link__updated_at(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-) -> None:
-    response = await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
     data = response.json()
-    original_updated_at = data["updated_at"]
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"target_url": f"{target_url}/1"},
-    )
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["updated_at"] > original_updated_at
+    assert datetime.fromisoformat(data["updated_at"]) == updated_at

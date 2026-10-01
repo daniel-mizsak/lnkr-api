@@ -45,6 +45,7 @@
     "pytest-asyncio==1.4.0",
     "pytest==9.1.1",
     "testcontainers[postgres]==4.15.0",
+    "time-machine==3.5.1",
     "ty==0.0.80",
   ]
   lint = ["ruff==0.16.7"]

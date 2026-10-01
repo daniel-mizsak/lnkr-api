@@ -26,22 +26,24 @@ async def test_verify_login_token__missing_frontend_api_key(client: AsyncClient)
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    data = response.json()
     error = data["detail"][0]
     assert error["msg"] == "The provided frontend api key is invalid"
     assert error["type"] == "frontend_api_key_invalid"
 
 
-async def test_verify_login_token__login_token_invalid(client: AsyncClient) -> None:
+async def test_verify_login_token__invalid_login_token(client: AsyncClient) -> None:
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
         json={"login_token_value": ""},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    data = response.json()
     error = data["detail"][0]
     assert error["msg"] == "The provided login token is invalid, used or has expired"
     assert error["type"] == "login_token_invalid"
@@ -59,21 +61,27 @@ async def test_verify_login_token__refresh_token_generation_failure(client: Asyn
         )
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["msg"] == "Unable to generate a refresh token. Please try again."
     assert error["type"] == "refresh_token_generation_failed"
 
 
-async def test_verify_login_token__login_token_valid(client: AsyncClient, issued_login_token: str, user: User) -> None:
+async def test_verify_login_token__valid_login_token(
+    client: AsyncClient,
+    requested_login_token: str,
+    user: User,
+) -> None:
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
-        json={"login_token_value": issued_login_token},
+        json={"login_token_value": requested_login_token},
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert set(data.keys()) == {"access_token", "refresh_token", "token_type"}
-    assert data["access_token"]
     access_token_payload = decode_access_token(data["access_token"])
     assert access_token_payload.sub == str(user.id)
     assert access_token_payload.type == "access"

@@ -4,106 +4,108 @@ Tests for the delete user endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import status
 from sqlalchemy import select
 
-from lnkr.api.dependencies.header import FRONTEND_API_KEY_HEADER
 from lnkr.config.application_settings import application_settings
-from lnkr.models import LoginToken, RefreshToken, User
-from lnkr.services.tokens.access_token_service import create_access_token
+from lnkr.models import Click, Link, LoginToken, RefreshToken, User
 
 if TYPE_CHECKING:
     from httpx2 import AsyncClient
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from tests.api.routes.conftest import OverrideGetCurrentUserFunction
+    from tests.api.routes.conftest import IssueAuthTokensFunction, OverrideGetCurrentUserFunction
 
 
-async def test_delete_user__user_does_not_exist(client: AsyncClient, session: AsyncSession, user: User) -> None:
-    await session.delete(user)
-    await session.commit()
+async def test_delete_user__user_does_not_exist(client: AsyncClient) -> None:
+    await client.delete(url=application_settings.USER_PREFIX)
 
     response = await client.delete(url=application_settings.USER_PREFIX)
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"][0]["type"] == "user_does_not_exist"
+
+    data = response.json()
+    error = data["detail"][0]
+    assert error["type"] == "user_does_not_exist"
 
 
 async def test_delete_user__links_and_clicks_removed(
     client: AsyncClient,
+    session: AsyncSession,
     override_get_current_user: OverrideGetCurrentUserFunction,
     user: User,
     user_other: User,
     slug: str,
     slug_other: str,
     target_url: str,
-    frontend_api_key: str,
 ) -> None:
     await client.post(
         url=application_settings.LINKS_PREFIX,
         json={"slug": slug, "target_url": target_url},
     )
-    await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
-    )
+    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
-
     assert response.status_code == status.HTTP_200_OK
-    assert len(data["items"]) == 1
+
+    data = response.json()
+    assert len(data["items"]) == 2
 
     override_get_current_user(user_other)
     await client.post(
         url=application_settings.LINKS_PREFIX,
         json={"slug": slug_other, "target_url": target_url},
     )
-    await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug_other}",
-        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
-    )
-
+    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug_other}")
+    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug_other}")
     override_get_current_user(user)
+
     response = await client.delete(url=application_settings.USER_PREFIX)
+
     assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert list((await session.scalars(select(Link.slug))).all()) == [slug_other]
+    assert list((await session.scalars(select(Link.slug).join(Click))).all()) == [slug_other, slug_other]
 
-    response = await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
-        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
-    )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    deleted_link_response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+    other_link_response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug_other}")
+    assert deleted_link_response.status_code == status.HTTP_404_NOT_FOUND
+    assert other_link_response.status_code == status.HTTP_200_OK
 
-    response = await client.get(
-        url=f"{application_settings.FORWARD_PREFIX}/{slug_other}",
-        headers={FRONTEND_API_KEY_HEADER: frontend_api_key},
+
+async def test_delete_user__slug_reused_after_deletion(
+    client: AsyncClient,
+    session: AsyncSession,
+    override_get_current_user: OverrideGetCurrentUserFunction,
+    user_other: User,
+    slug: str,
+    target_url: str,
+) -> None:
+    await client.post(
+        url=application_settings.LINKS_PREFIX,
+        json={"slug": slug, "target_url": target_url},
     )
+    await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
     assert response.status_code == status.HTTP_200_OK
 
-    override_get_current_user(user_other)
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug_other}/clicks")
     data = response.json()
+    assert len(data["items"]) == 1
 
-    assert response.status_code == status.HTTP_200_OK
-    assert len(data["items"]) == 2
+    await client.delete(url=application_settings.USER_PREFIX)
+    override_get_current_user(user_other)
 
-    # Slug can be reused.
     response = await client.post(
         url=application_settings.LINKS_PREFIX,
         json={"slug": slug, "target_url": target_url},
     )
 
     assert response.status_code == status.HTTP_201_CREATED
-
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
-
-    assert response.status_code == status.HTTP_200_OK
-    assert data["items"] == []
+    assert list((await session.scalars(select(Click.id))).all()) == []
 
 
 async def test_delete_user__login_and_refresh_tokens_removed(
@@ -111,18 +113,11 @@ async def test_delete_user__login_and_refresh_tokens_removed(
     session: AsyncSession,
     user: User,
     user_other: User,
+    issue_auth_tokens: IssueAuthTokensFunction,
 ) -> None:
-    expires_at = datetime.now(tz=UTC) + timedelta(days=1)
-    session.add_all(
-        [
-            LoginToken(email=user.email, token_hash="a" * 64, expires_at=expires_at),
-            LoginToken(email=user_other.email, token_hash="b" * 64, expires_at=expires_at),
-            RefreshToken(user_id=user.id, token_hash="c" * 64, expires_at=expires_at),
-            RefreshToken(user_id=user.id, token_hash="d" * 64, expires_at=expires_at),
-            RefreshToken(user_id=user_other.id, token_hash="e" * 64, expires_at=expires_at),
-        ]
-    )
-    await session.commit()
+    await issue_auth_tokens(user.email)
+    await issue_auth_tokens(user.email)
+    await issue_auth_tokens(user_other.email)
 
     response = await client.delete(url=application_settings.USER_PREFIX)
 
@@ -136,26 +131,32 @@ async def test_delete_user__access_token_rejected_after_deletion(
     client: AsyncClient,
     user: User,
     user_other: User,
+    issue_auth_tokens: IssueAuthTokensFunction,
 ) -> None:
-    access_token = create_access_token(user.id)
-    other_access_token = create_access_token(user_other.id)
+    auth_tokens = await issue_auth_tokens(user.email)
+    other_auth_tokens = await issue_auth_tokens(user_other.email)
 
     response = await client.delete(
         url=application_settings.USER_PREFIX,
-        headers={"Authorization": f"Bearer {access_token}"},
+        headers={"Authorization": f"Bearer {auth_tokens['access_token']}"},
     )
+
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    response = await client.get(
+    deleted_user_response = await client.get(
         url=application_settings.USER_PREFIX,
-        headers={"Authorization": f"Bearer {access_token}"},
+        headers={"Authorization": f"Bearer {auth_tokens['access_token']}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"][0]["type"] == "user_does_not_exist"
+    other_user_response = await client.get(
+        url=application_settings.USER_PREFIX,
+        headers={"Authorization": f"Bearer {other_auth_tokens['access_token']}"},
+    )
+    assert deleted_user_response.status_code == status.HTTP_404_NOT_FOUND
 
-    response = await client.get(
-        url=application_settings.USER_PREFIX,
-        headers={"Authorization": f"Bearer {other_access_token}"},
-    )
-    assert response.status_code == status.HTTP_200_OK
-    assert response.json()["email"] == user_other.email
+    data = deleted_user_response.json()
+    error = data["detail"][0]
+    assert error["type"] == "user_does_not_exist"
+    assert other_user_response.status_code == status.HTTP_200_OK
+
+    data = other_user_response.json()
+    assert data["email"] == user_other.email

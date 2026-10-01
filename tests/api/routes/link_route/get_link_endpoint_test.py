@@ -4,14 +4,16 @@ Tests for the get link endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import status
 
 from lnkr.config.application_settings import application_settings
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from httpx2 import AsyncClient
 
     from lnkr.models import User
@@ -20,9 +22,10 @@ if TYPE_CHECKING:
 
 async def test_get_link__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -43,10 +46,12 @@ async def test_get_link__slug_not_owned_by_user(
     )
 
     override_get_current_user(user_other)
+
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    data = response.json()
     error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
@@ -54,35 +59,28 @@ async def test_get_link__slug_not_owned_by_user(
     assert error["type"] == "slug_not_owned_by_user"
 
 
-async def test_get_link__slug_owned_by_current_user(client: AsyncClient, slug: str, target_url: str) -> None:
+@pytest.mark.usefixtures("frozen_now")
+async def test_get_link__slug_owned_by_current_user(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    now: datetime,
+) -> None:
     await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
+        url=application_settings.LINKS_PREFIX,
         json={"slug": slug, "target_url": target_url},
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert set(data.keys()) == {
-        "slug",
-        "target_url",
-        "status",
-        "favorite",
-        "expires_at",
-        "password_protected",
-        "created_at",
-        "updated_at",
+    assert response.json() == {
+        "slug": slug,
+        "target_url": target_url,
+        "status": "active",
+        "favorite": False,
+        "expires_at": None,
+        "password_protected": False,
+        "created_at": now.isoformat().replace("+00:00", "Z"),
+        "updated_at": now.isoformat().replace("+00:00", "Z"),
     }
-    assert data["slug"] == slug
-    assert data["target_url"] == target_url
-    assert data["status"] == "active"
-    assert data["favorite"] is False
-    assert data["expires_at"] is None
-
-    now = datetime.now(UTC)
-    created_at = datetime.fromisoformat(data["created_at"])
-    updated_at = datetime.fromisoformat(data["updated_at"])
-
-    assert now - timedelta(seconds=5) <= created_at <= now
-    assert now - timedelta(seconds=5) <= updated_at <= now

@@ -4,10 +4,10 @@ Tests for the list clicks endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest import mock
 
+import pytest
 from fastapi import status
 
 from lnkr.api.dependencies.header import CLIENT_IP_HEADER, FRONTEND_API_KEY_HEADER, USER_AGENT_HEADER
@@ -17,6 +17,8 @@ from lnkr.exceptions import SlugNotOwnedByUserError
 from lnkr.models.click_model import CLICK_CURSOR_MAX_LENGTH
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from httpx2 import AsyncClient
 
 
@@ -24,7 +26,10 @@ async def test_list_clicks__slug_does_not_exist(client: AsyncClient, slug: str) 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"][0]["type"] == "slug_does_not_exist"
+
+    data = response.json()
+    error = data["detail"][0]
+    assert error["type"] == "slug_does_not_exist"
 
 
 async def test_list_clicks__slug_not_owned_by_user(client: AsyncClient, slug: str) -> None:
@@ -36,7 +41,9 @@ async def test_list_clicks__slug_not_owned_by_user(client: AsyncClient, slug: st
         response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["type"] == "slug_not_owned_by_user"
@@ -54,7 +61,10 @@ async def test_list_clicks__invalid_cursor(client: AsyncClient, slug: str, targe
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["detail"][0]["type"] == "cursor_invalid"
+
+    data = response.json()
+    error = data["detail"][0]
+    assert error["type"] == "cursor_invalid"
 
 
 async def test_list_clicks__cursor_too_long(client: AsyncClient, slug: str, target_url: str) -> None:
@@ -69,11 +79,14 @@ async def test_list_clicks__cursor_too_long(client: AsyncClient, slug: str, targ
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    error = response.json()["detail"][0]
+
+    data = response.json()
+    error = data["detail"][0]
     assert error["loc"] == ["query", "cursor"]
     assert error["type"] == "string_too_long"
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_list_clicks__recorded_click_metadata(
     client: AsyncClient,
     slug: str,
@@ -82,10 +95,10 @@ async def test_list_clicks__recorded_click_metadata(
     ip_address_public: str,
     ip_address_public_country_code: str,
     user_agent: str,
+    now: datetime,
 ) -> None:
-    before = datetime.now(tz=UTC)
     await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
+        url=application_settings.LINKS_PREFIX,
         json={"slug": slug, "target_url": target_url},
     )
     await client.get(
@@ -98,23 +111,18 @@ async def test_list_clicks__recorded_click_metadata(
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
-    assert data["next_cursor"] is None
-    assert len(data["items"]) == 1
-    click = data["items"][0]
-    assert set(click) == {
-        "timestamp",
-        "source",
-        "ip_address",
-        "country_code",
-        "browser",
-        "operating_system",
+    assert response.json() == {
+        "next_cursor": None,
+        "items": [
+            {
+                "timestamp": now.isoformat().replace("+00:00", "Z"),
+                "source": "lnkr_app",
+                "ip_address": ip_address_public,
+                "country_code": ip_address_public_country_code,
+                "browser": "Chrome",
+                "operating_system": "Mac OS X",
+            }
+        ],
     }
-    assert before <= datetime.fromisoformat(click["timestamp"]) <= before + timedelta(seconds=1)
-    assert click["source"] == "lnkr_app"
-    assert click["ip_address"] == ip_address_public
-    assert click["country_code"] == ip_address_public_country_code
-    assert click["browser"] == "Chrome"
-    assert click["operating_system"] == "Mac OS X"
