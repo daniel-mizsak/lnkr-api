@@ -4,7 +4,12 @@ Tests for the email service.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import copy
+import smtplib
+import socket
+import ssl
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from unittest import mock
 
 import pytest
@@ -21,6 +26,108 @@ async def test_send_email__offloads_blocking_smtp_call() -> None:
         await email_service.send_email(message)
 
     run_sync.assert_awaited_once_with(email_service._send_email_sync, message)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "send_error",
+    [
+        pytest.param(smtplib.SMTPDataError(451, b"Try again later"), id="message-rejected"),
+        pytest.param(
+            smtplib.SMTPRecipientsRefused({"user@example.com": (450, b"Try again later")}),
+            id="recipient-unavailable",
+        ),
+        pytest.param(smtplib.SMTPServerDisconnected("Disconnected"), id="smtp-disconnected"),
+        pytest.param(ConnectionRefusedError("Connection refused"), id="connection-refused"),
+        pytest.param(TimeoutError("Timed out"), id="timeout"),
+        pytest.param(socket.gaierror(socket.EAI_AGAIN, "Temporary DNS failure"), id="temporary-dns-failure"),
+    ],
+)
+async def test_send_email__retries_transient_failure(send_error: OSError) -> None:
+    message = MIMEMultipart()
+    run_sync = mock.AsyncMock(side_effect=[send_error, None])
+    sleep = mock.AsyncMock()
+
+    with (
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
+    ):
+        await email_service.send_email(message)
+
+    assert run_sync.await_count == 2
+    sleep.assert_awaited_once()
+
+
+async def test_send_email__exhausted_sending_attempts() -> None:
+    message = MIMEMultipart()
+    send_error = TimeoutError("Timed out")
+    run_sync = mock.AsyncMock(side_effect=send_error)
+    sleep = mock.AsyncMock()
+
+    with (
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
+        mock.patch.object(email_service.random, "uniform", side_effect=[0.25, 0.5]),
+        pytest.raises(TimeoutError) as exc_info,
+    ):
+        await email_service.send_email(message)
+
+    assert exc_info.value is send_error
+    assert run_sync.await_count == 3
+    assert sleep.await_args_list == [mock.call(1.25), mock.call(2.5)]  # 1 + 0.25, 2 + 0.5
+
+
+@pytest.mark.parametrize(
+    "send_error",
+    [
+        pytest.param(smtplib.SMTPAuthenticationError(535, b"Invalid credentials"), id="invalid-credentials"),
+        pytest.param(
+            smtplib.SMTPRecipientsRefused({"user@example.com": (550, b"Unknown recipient")}),
+            id="unknown-recipient",
+        ),
+        pytest.param(ssl.SSLCertVerificationError("Invalid certificate"), id="invalid-certificate"),
+        pytest.param(socket.gaierror(socket.EAI_NONAME, "Unknown hostname"), id="unknown-hostname"),
+        pytest.param(ValueError("Unexpected error"), id="unexpected-error"),
+    ],
+)
+async def test_send_email__does_not_retry_non_retryable_failure(send_error: Exception) -> None:
+    message = MIMEMultipart()
+    run_sync = mock.AsyncMock(side_effect=send_error)
+    sleep = mock.AsyncMock()
+
+    with (
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
+        pytest.raises(type(send_error)) as exc_info,
+    ):
+        await email_service.send_email(message)
+
+    assert exc_info.value is send_error
+    run_sync.assert_awaited_once()
+    sleep.assert_not_awaited()
+
+
+async def test_send_email__preserves_message_and_idempotency_key_across_retries() -> None:
+    message = MIMEMultipart()
+    message["Resend-Idempotency-Key"] = "login-token/test"
+    message.attach(MIMEText("Login token: ABC123", "html"))
+    payloads: list[bytes] = []
+    send = mock.Mock(side_effect=[TimeoutError("Timed out"), None])
+
+    def send_email_sync(message: MIMEMultipart) -> None:
+        # Serialize a copy, as smtplib.send_message does, to catch regenerated MIME boundaries.
+        payload = copy.copy(message).as_bytes()
+        payloads.append(payload)
+        send(payload)
+
+    with (
+        mock.patch.object(email_service, "_send_email_sync", side_effect=send_email_sync),
+        mock.patch.object(email_service, "sleep", mock.AsyncMock()),
+    ):
+        await email_service.send_email(message)
+
+    assert len(payloads) == 2
+    assert payloads[0] == payloads[1]
+    assert b"Resend-Idempotency-Key: login-token/test" in payloads[0]
 
 
 @pytest.mark.parametrize(

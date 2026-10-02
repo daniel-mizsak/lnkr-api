@@ -15,8 +15,9 @@
 - Name tests `test_<operation>__<scenario_or_behavior>`, using neighboring terminology. Keep one scenario per test; multiple actions are appropriate when testing a sequence.
 - Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
 - Separate Arrange, Act, Assert; store results before asserting (`pytest.raises` is an exception); omit routine section comments.
-- Assert scenario-specific outcomes without duplicating other tests; retain checks needed to prove state transitions. Use dictionary equality for long JSON contracts; for short responses, assign `data = response.json()` before individual assertions or extracting `error`. Preserve endpoint status, authorization, and response-contract checks; assert status before reading the body.
+- Keep assertions focused on the named scenario. Add supporting checks only when needed to prove its outcome or state transition; avoid repeating lower-level behavior already covered elsewhere.
+- Preserve endpoint status, authorization, and response-contract checks; assert status before reading the body. Use dictionary equality for long JSON contracts; for short responses, assign `data = response.json()` before individual assertions or extracting `error`.
 - Set up endpoint tests through APIs; write directly to the database only for otherwise unreachable states. Database reads may verify side effects.
 - Use fixed `now` for ordinary time data. Opt into `@pytest.mark.usefixtures("frozen_now")` when code reads the current time; use local `time_machine.travel(..., tick=False)` contexts for boundaries or time changes. Fixtures needing frozen setup must depend on `frozen_now`.
 - Use `just test` with Docker running; bare `uv run pytest` skips required environment setup.
-- Before finishing, pass `just check-all` (lint, types, tests, 100% test-code coverage).
+- Before finishing, pass `just check-all` (lint, types, tests, 100% test-code coverage) except for documentation-only changes.

@@ -28,6 +28,7 @@ async def test_generate_random_slug__generation_failure(client: AsyncClient) -> 
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert response.headers["Cache-Control"] == "no-store"
+
     data = response.json()
     error = data["detail"][0]
     assert error["msg"] == "Unable to generate an unused random slug. Please try again."
@@ -39,5 +40,6 @@ async def test_generate_random_slug__slug_format_and_cache_policy(client: AsyncC
 
     assert response.status_code == status.HTTP_200_OK
     assert response.headers["Cache-Control"] == "no-store"
+
     data = response.json()
     assert re.fullmatch(r"^[a-zA-Z0-9]{6}$", data["slug"])

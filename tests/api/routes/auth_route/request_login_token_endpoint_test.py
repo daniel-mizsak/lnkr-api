@@ -4,6 +4,7 @@ Tests for the request login token endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import smtplib
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -58,6 +59,70 @@ async def test_request_login_token__login_token_generation_failure(
     assert error["type"] == "login_token_generation_failed"
     create_and_save_login_token.assert_awaited_once()
     mock_send_email.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("frozen_now")
+@pytest.mark.parametrize(
+    "send_error",
+    [
+        pytest.param(smtplib.SMTPDataError(550, b"Private provider details"), id="smtp-failure"),
+        pytest.param(TimeoutError("Private connection details"), id="timeout"),
+        pytest.param(OSError("Private OS details"), id="os-failure"),
+    ],
+)
+async def test_request_login_token__email_delivery_failure(
+    client: AsyncClient,
+    mock_send_email: mock.AsyncMock,
+    email: str,
+    send_error: OSError,
+) -> None:
+    mock_send_email.side_effect = send_error
+
+    response = await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.headers["retry-after"] == "60"
+    assert response.headers["cache-control"] == "no-store"
+
+    data = response.json()
+    error = data["detail"][0]
+    assert error["msg"] == "Unable to send a login token. Please request a new token in 60 seconds."
+    assert error["type"] == "login_token_delivery_failed"
+
+
+@pytest.mark.usefixtures("frozen_now")
+async def test_request_login_token__successful_request_after_email_delivery_failure(
+    client: AsyncClient,
+    mock_send_email: mock.AsyncMock,
+    email: str,
+) -> None:
+    mock_send_email.side_effect = [TimeoutError("Timed out"), None]
+
+    failed_response = await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+    )
+    retry_response = await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+    )
+
+    assert failed_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert retry_response.status_code == status.HTTP_204_NO_CONTENT
+    assert retry_response.content == b""
+
+    failed_call = mock_send_email.await_args_list[0]
+    failed_message = failed_call.args[0]
+    failed_idempotency_key = failed_message["Resend-Idempotency-Key"]
+    retry_call = mock_send_email.await_args_list[1]
+    retry_message = retry_call.args[0]
+    retry_idempotency_key = retry_message["Resend-Idempotency-Key"]
+    assert failed_idempotency_key
+    assert retry_idempotency_key
+    assert retry_idempotency_key != failed_idempotency_key
 
 
 async def test_request_login_token__missing_request_metadata(

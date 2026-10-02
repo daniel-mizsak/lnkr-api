@@ -100,8 +100,8 @@ async def test_unlock_target_url__wrong_password(
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
     assert response.headers["Cache-Control"] == "no-store"
+
     data = response.json()
     error = data["detail"][0]
     assert error["msg"] == f"The provided password for link with slug '{slug}' is invalid"

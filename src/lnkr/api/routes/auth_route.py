@@ -4,6 +4,7 @@ API endpoints for authentication.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, Annotated
@@ -14,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from lnkr.api.dependencies import get_geoip_reader, get_ip_address, get_session, get_user_agent, verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import (
+    LoginTokenDeliveryError,
     LoginTokenGenerationError,
     LoginTokenInvalidError,
     RefreshTokenGenerationError,
@@ -77,8 +79,11 @@ async def request_login_token_endpoint(
         country_code,
         user_agent,
     )
-    # TODO: Add try-except logic and stricter rate limiting.
-    await send_email(message)
+    # TODO: Add stricter rate limiting.
+    try:
+        await send_email(message)
+    except OSError:
+        LoginTokenDeliveryError().raise_http_exception()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -144,6 +149,7 @@ def _create_login_token_email(
     message["From"] = application_settings.FROM_EMAIL
     message["To"] = to_address
     message["Subject"] = "Sign in to lnkr.by"
+    message["Resend-Idempotency-Key"] = str(uuid.uuid4())
 
     message_body = email_templates.get_template("login_token.html.j2").render(
         expiry_time=application_settings.LOGIN_TOKEN_EXPIRE_MINUTES,

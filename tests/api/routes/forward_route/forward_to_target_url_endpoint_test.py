@@ -226,8 +226,8 @@ async def test_forward_to_target_url__password_required(
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
     assert response.headers["Cache-Control"] == "no-store"
+
     data = response.json()
     error = data["detail"][0]
     assert error["msg"] == f"Link with slug '{slug}' requires a password"
