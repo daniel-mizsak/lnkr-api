@@ -4,6 +4,7 @@ High level services for email management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import random
 import smtplib
 import socket
@@ -15,6 +16,8 @@ from lnkr.config.application_settings import ApplicationEnvironment, application
 
 if TYPE_CHECKING:
     from email.mime.multipart import MIMEMultipart
+
+logger = logging.getLogger(__name__)
 
 
 SMTP_TEMPORARY_ERROR_MIN = 400
@@ -30,10 +33,15 @@ async def send_email(message: MIMEMultipart) -> None:
     for attempt in range(maximum_email_sending_attempts):
         try:
             await to_thread.run_sync(_send_email_sync, message)
+        # SMTPException also inherits from OSError.
         except OSError as error:
-            # SMTPException also inherits from OSError.
-            if attempt == maximum_email_sending_attempts - 1 or not _is_retryable_smtp_error(error):
+            if not _is_retryable_smtp_error(error):
+                logger.exception("email.non_retryable_error")
                 raise
+            if attempt == maximum_email_sending_attempts - 1:
+                logger.exception("email.retries_exhausted")
+                raise
+            logger.warning("email.retrying", exc_info=True)
             jitter = random.uniform(0, 0.5)  # noqa: S311 - Retry jitter does not require cryptographic randomness.
             await sleep(2**attempt + jitter)
         else:
@@ -73,13 +81,19 @@ def _send_email_sync(message: MIMEMultipart) -> None:
 
     if application_settings.ENVIRONMENT == ApplicationEnvironment.DEVELOPMENT:
         with smtplib.SMTP(
-            host=application_settings.SMTP_HOST, port=application_settings.SMTP_PORT, timeout=timeout
+            host=application_settings.SMTP_HOST,
+            port=application_settings.SMTP_PORT,
+            timeout=timeout,
         ) as smtp_server:
             smtp_server.login(application_settings.SMTP_USER, application_settings.SMTP_PASSWORD.get_secret_value())
             smtp_server.send_message(message)
     else:
         with smtplib.SMTP_SSL(
-            host=application_settings.SMTP_HOST, port=application_settings.SMTP_PORT, timeout=timeout
+            host=application_settings.SMTP_HOST,
+            port=application_settings.SMTP_PORT,
+            timeout=timeout,
         ) as smtp_server:
             smtp_server.login(application_settings.SMTP_USER, application_settings.SMTP_PASSWORD.get_secret_value())
             smtp_server.send_message(message)
+
+    logger.info("email.accepted")

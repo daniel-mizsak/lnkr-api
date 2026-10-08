@@ -4,9 +4,12 @@ Tests for the header dependencies.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
+
 import pytest
 from fastapi import HTTPException, status
 
+from lnkr.api.dependencies import header
 from lnkr.api.dependencies.header import (
     check_frontend_api_key,
     get_ip_address,
@@ -40,7 +43,9 @@ def test_check_frontend_api_key__valid(frontend_api_key: str) -> None:
     assert is_valid is True
 
 
-def test_verify_frontend_api_key__missing() -> None:
+def test_verify_frontend_api_key__missing(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=header.__name__)
+
     with pytest.raises(HTTPException) as exc_info:
         verify_frontend_api_key(None)
 
@@ -48,9 +53,12 @@ def test_verify_frontend_api_key__missing() -> None:
 
     assert error.status_code == status.HTTP_401_UNAUTHORIZED
     assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
+    assert caplog.record_tuples == [(header.__name__, logging.INFO, "auth.frontend_key_invalid")]
 
 
-def test_verify_frontend_api_key__invalid(frontend_api_key_invalid: str) -> None:
+def test_verify_frontend_api_key__invalid(frontend_api_key_invalid: str, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=header.__name__)
+
     with pytest.raises(HTTPException) as exc_info:
         verify_frontend_api_key(frontend_api_key_invalid)
 
@@ -58,6 +66,7 @@ def test_verify_frontend_api_key__invalid(frontend_api_key_invalid: str) -> None
 
     assert error.status_code == status.HTTP_401_UNAUTHORIZED
     assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
+    assert caplog.record_tuples == [(header.__name__, logging.INFO, "auth.frontend_key_invalid")]
 
 
 def test_verify_frontend_api_key__valid(frontend_api_key: str) -> None:

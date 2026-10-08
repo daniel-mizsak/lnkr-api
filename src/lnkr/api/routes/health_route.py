@@ -4,6 +4,7 @@ API endpoints for health check.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -31,6 +34,7 @@ async def health_check_endpoint(
     try:
         await session.execute(text("SELECT 1"))
     except OperationalError:
+        logger.exception("database.health_query_failed")
         return JSONResponse(
             content={"message": "Database connection failed"},
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -39,7 +43,11 @@ async def health_check_endpoint(
     try:
         cache_status = await cache.ping()
     except RedisError:
+        logger.exception("redis.health_ping_failed")
         cache_status = False
+    else:
+        if not cache_status:
+            logger.error("redis.health_ping_failed")
 
     if not cache_status:
         return JSONResponse(

@@ -13,7 +13,7 @@
 
 - Add tests for new features only when asked.
 - Name tests `test_<operation>__<scenario_or_behavior>`, using neighboring terminology. Keep one scenario per test; multiple actions are appropriate when testing a sequence.
-- Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
+- Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets. Split cases when sharing assertions requires indirect logic.
 - Separate Arrange, Act, Assert; store results before asserting (`pytest.raises` is an exception); omit routine section comments.
 - Keep assertions focused on the named scenario. Add supporting checks only when needed to prove its outcome or state transition; avoid repeating lower-level behavior already covered elsewhere.
 - Preserve endpoint status, authorization, and response-contract checks; assert status before reading the body. Use dictionary equality for long JSON contracts; for short responses, assign `data = response.json()` before individual assertions or extracting `error`.

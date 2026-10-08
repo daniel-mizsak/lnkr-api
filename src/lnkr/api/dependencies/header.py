@@ -6,6 +6,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 
 import hmac
 import ipaddress
+import logging
 from typing import Annotated
 
 from fastapi import Header
@@ -15,6 +16,8 @@ from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import FrontendApiKeyInvalidError
 from lnkr.models import IpAddress, UserAgent
 from lnkr.models.constraints import USER_AGENT_METADATA_MAX_LENGTH
+
+logger = logging.getLogger(__name__)
 
 FRONTEND_API_KEY_HEADER = "X-Frontend-Api-Key"
 CLIENT_IP_HEADER = "X-Client-IP"
@@ -33,6 +36,7 @@ def verify_frontend_api_key(
 ) -> None:
     """Verify that the provided frontend API key is valid."""
     if not _api_key_matches(x_frontend_api_key):
+        logger.info("auth.frontend_key_invalid")
         FrontendApiKeyInvalidError().raise_http_exception()
 
 

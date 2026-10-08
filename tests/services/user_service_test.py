@@ -4,6 +4,7 @@ Tests for the user service.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -178,18 +179,33 @@ async def test_delete_user__commit_failure_rolls_back_without_invalidating_cache
     assert await session.get(LoginToken, login_token_id) is not None
 
 
-async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: User, link: Link) -> None:
+async def test_delete_user__cache_failure_ignored(
+    session: AsyncSession,
+    user: User,
+    link: Link,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=user_service.__name__)
     user_id = user.id
     slug = link.slug
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    set_cached_links_invalidated = mock.AsyncMock(side_effect=RedisError("cache failure"))
+    cache_error = RedisError("cache failure")
+    set_cached_links_invalidated = mock.AsyncMock(side_effect=cache_error)
 
     with mock.patch.object(user_service.link_cache, "set_cached_links_invalidated", set_cached_links_invalidated):
         await user_service.delete_user(session, cache, user)
 
+    deleted_user = await session.get(User, user_id)
+    deleted_link = await user_service.link_database.get_link_by_slug(session, slug)
+
     set_cached_links_invalidated.assert_awaited_once_with(cache, [slug])
-    assert await session.get(User, user_id) is None
-    assert await user_service.link_database.get_link_by_slug(session, slug) is None
+    assert deleted_user is None
+    assert deleted_link is None
+    assert caplog.record_tuples == [
+        (user_service.__name__, logging.WARNING, "redis.set_cached_links_invalidation_failed")
+    ]
+    assert caplog.records[0].exc_info is not None
+    assert caplog.records[0].exc_info[1] is cache_error

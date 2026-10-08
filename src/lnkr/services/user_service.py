@@ -4,7 +4,7 @@ High level services for user management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-import contextlib
+import logging
 from typing import TYPE_CHECKING
 
 from redis.exceptions import RedisError
@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+logger = logging.getLogger(__name__)
 
 
 async def get_user_by_id(session: AsyncSession, user_id: uuid.UUID) -> User:
@@ -73,5 +76,7 @@ async def delete_user(session: AsyncSession, cache: Redis, user: User) -> None:
         await session.rollback()
         raise
 
-    with contextlib.suppress(RedisError):
+    try:
         await link_cache.set_cached_links_invalidated(cache, slugs)
+    except RedisError:
+        logger.warning("redis.set_cached_links_invalidation_failed", exc_info=True)

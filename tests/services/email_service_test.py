@@ -5,6 +5,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import copy
+import logging
 import smtplib
 import socket
 import ssl
@@ -42,7 +43,8 @@ async def test_send_email__offloads_blocking_smtp_call() -> None:
         pytest.param(socket.gaierror(socket.EAI_AGAIN, "Temporary DNS failure"), id="temporary-dns-failure"),
     ],
 )
-async def test_send_email__retries_transient_failure(send_error: OSError) -> None:
+async def test_send_email__retries_transient_failure(send_error: OSError, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
     run_sync = mock.AsyncMock(side_effect=[send_error, None])
     sleep = mock.AsyncMock()
@@ -55,9 +57,13 @@ async def test_send_email__retries_transient_failure(send_error: OSError) -> Non
 
     assert run_sync.await_count == 2
     sleep.assert_awaited_once()
+    assert caplog.record_tuples == [(email_service.__name__, logging.WARNING, "email.retrying")]
+    assert caplog.records[0].exc_info is not None
+    assert caplog.records[0].exc_info[1] is send_error
 
 
-async def test_send_email__exhausted_sending_attempts() -> None:
+async def test_send_email__exhausted_sending_attempts(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
     send_error = TimeoutError("Timed out")
     run_sync = mock.AsyncMock(side_effect=send_error)
@@ -70,10 +76,17 @@ async def test_send_email__exhausted_sending_attempts() -> None:
         pytest.raises(TimeoutError) as exc_info,
     ):
         await email_service.send_email(message)
+    logged_errors = [record.exc_info[1] for record in caplog.records if record.exc_info is not None]
 
     assert exc_info.value is send_error
     assert run_sync.await_count == 3
     assert sleep.await_args_list == [mock.call(1.25), mock.call(2.5)]  # 1 + 0.25, 2 + 0.5
+    assert caplog.record_tuples == [
+        (email_service.__name__, logging.WARNING, "email.retrying"),
+        (email_service.__name__, logging.WARNING, "email.retrying"),
+        (email_service.__name__, logging.ERROR, "email.retries_exhausted"),
+    ]
+    assert logged_errors == [send_error] * 3
 
 
 @pytest.mark.parametrize(
@@ -86,10 +99,13 @@ async def test_send_email__exhausted_sending_attempts() -> None:
         ),
         pytest.param(ssl.SSLCertVerificationError("Invalid certificate"), id="invalid-certificate"),
         pytest.param(socket.gaierror(socket.EAI_NONAME, "Unknown hostname"), id="unknown-hostname"),
-        pytest.param(ValueError("Unexpected error"), id="unexpected-error"),
     ],
 )
-async def test_send_email__does_not_retry_non_retryable_failure(send_error: Exception) -> None:
+async def test_send_email__does_not_retry_non_retryable_failure(
+    send_error: OSError,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
     run_sync = mock.AsyncMock(side_effect=send_error)
     sleep = mock.AsyncMock()
@@ -104,6 +120,29 @@ async def test_send_email__does_not_retry_non_retryable_failure(send_error: Exce
     assert exc_info.value is send_error
     run_sync.assert_awaited_once()
     sleep.assert_not_awaited()
+    assert caplog.record_tuples == [(email_service.__name__, logging.ERROR, "email.non_retryable_error")]
+    assert caplog.records[0].exc_info is not None
+    assert caplog.records[0].exc_info[1] is send_error
+
+
+async def test_send_email__does_not_retry_unexpected_failure(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
+    message = MIMEMultipart()
+    send_error = ValueError("Unexpected error")
+    run_sync = mock.AsyncMock(side_effect=send_error)
+    sleep = mock.AsyncMock()
+
+    with (
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
+        pytest.raises(ValueError, match="Unexpected error") as exc_info,
+    ):
+        await email_service.send_email(message)
+
+    assert exc_info.value is send_error
+    run_sync.assert_awaited_once()
+    sleep.assert_not_awaited()
+    assert caplog.record_tuples == []
 
 
 async def test_send_email__preserves_message_and_idempotency_key_across_retries() -> None:
@@ -140,7 +179,9 @@ async def test_send_email__preserves_message_and_idempotency_key_across_retries(
 def test_send_email_sync__uses_environment_specific_smtp_client(
     environment: ApplicationEnvironment,
     smtp_client_name: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
     smtp_client = mock.MagicMock()
     smtp_server = smtp_client.return_value.__enter__.return_value
@@ -161,3 +202,4 @@ def test_send_email_sync__uses_environment_specific_smtp_client(
         application_settings.SMTP_PASSWORD.get_secret_value(),
     )
     smtp_server.send_message.assert_called_once_with(message)
+    assert caplog.record_tuples == [(email_service.__name__, logging.INFO, "email.accepted")]

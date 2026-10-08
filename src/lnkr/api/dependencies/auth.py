@@ -4,6 +4,7 @@ FastAPI dependency that provides the user authentication.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from typing import TYPE_CHECKING, Annotated
 
@@ -22,6 +23,8 @@ if TYPE_CHECKING:
 
     from lnkr.models import User
 
+logger = logging.getLogger(__name__)
+
 security = HTTPBearer(auto_error=False)
 
 
@@ -33,23 +36,28 @@ async def get_current_user(
     if credentials is None:
         if application_settings.ENVIRONMENT == ApplicationEnvironment.DEVELOPMENT:
             return await get_user_by_email(session, application_settings.DEVELOPMENT_USER_EMAIL)
+        logger.info("auth.access_credentials_missing")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
 
     token = credentials.credentials
     if not token:
+        logger.info("auth.access_token_missing")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization token is missing")
 
     try:
         access_token_payload = decode_access_token(token)
     except jwt.InvalidTokenError as error:
+        logger.info("auth.access_token_invalid")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
 
     try:
         user_id = uuid.UUID(access_token_payload.sub)
     except ValueError as error:
+        logger.info("auth.access_token_subject_invalid")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
 
     try:
         return await get_user_by_id(session, user_id)
     except UserDoesNotExistError as user_does_not_exist_error:
+        logger.info("auth.access_token_user_missing")
         user_does_not_exist_error.raise_http_exception()

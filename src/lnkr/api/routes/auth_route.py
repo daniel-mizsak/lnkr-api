@@ -4,6 +4,7 @@ API endpoints for authentication.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
 
     from lnkr.models import IpAddress, UserAgent
 
+logger = logging.getLogger(__name__)
+
 email_templates = Jinja2Templates(directory="templates/email")
 
 
@@ -70,6 +73,7 @@ async def request_login_token_endpoint(
             user_agent,
         )
     except LoginTokenGenerationError as login_token_generation_error:
+        logger.exception("auth.login_token_retries_exhausted")
         login_token_generation_error.raise_http_exception()
 
     message = _create_login_token_email(
@@ -84,6 +88,7 @@ async def request_login_token_endpoint(
         await send_email(message)
     except OSError:
         LoginTokenDeliveryError().raise_http_exception()
+    logger.info("auth.login_token_requested")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -96,11 +101,14 @@ async def verify_login_token_endpoint(
     try:
         user, refresh_token = await authenticate_with_login_token(session, login_token_verify.login_token_value)
     except LoginTokenInvalidError as login_token_invalid_error:
+        logger.info("auth.login_token_invalid")
         login_token_invalid_error.raise_http_exception()
     except RefreshTokenGenerationError as refresh_token_generation_error:
+        logger.exception("auth.refresh_token_retries_exhausted")
         refresh_token_generation_error.raise_http_exception()
 
     access_token = create_access_token(user_id=user.id)
+    logger.info("auth.login_succeeded")
     return AuthTokensRead(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -114,13 +122,17 @@ async def refresh_auth_tokens_endpoint(
         user_id, new_refresh_token = await rotate_refresh_token(session, refresh_token_rotate.refresh_token_value)
         user = await get_user_by_id(session, user_id)
     except RefreshTokenInvalidError as refresh_token_invalid_error:
+        logger.info("auth.refresh_token_invalid")
         refresh_token_invalid_error.raise_http_exception()
     except RefreshTokenGenerationError as refresh_token_generation_error:
+        logger.exception("auth.refresh_token_retries_exhausted")
         refresh_token_generation_error.raise_http_exception()
     except UserDoesNotExistError as user_does_not_exist_error:
+        logger.info("auth.refresh_token_user_missing")
         user_does_not_exist_error.raise_http_exception()
 
     access_token = create_access_token(user.id)
+    logger.info("auth.refresh_succeeded")
     return AuthTokensRead(access_token=access_token, refresh_token=new_refresh_token)
 
 
@@ -133,8 +145,10 @@ async def revoke_refresh_token_endpoint(
     try:
         await revoke_refresh_token(session, refresh_token_revoke.refresh_token_value)
     except RefreshTokenInvalidError as refresh_token_invalid_error:
+        logger.info("auth.revoke_token_invalid")
         refresh_token_invalid_error.raise_http_exception()
 
+    logger.info("auth.revoke_succeeded")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

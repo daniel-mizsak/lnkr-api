@@ -4,8 +4,8 @@ High level services for link management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-import contextlib
 import io
+import logging
 import secrets
 import string
 from datetime import UTC, datetime
@@ -37,6 +37,9 @@ from lnkr.models import Link, LinkCache, LinkCreate, LinkStatus, LinkUpdate, Use
 if TYPE_CHECKING:
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+logger = logging.getLogger(__name__)
 
 
 async def create_link(session: AsyncSession, link_create: LinkCreate, user: User) -> Link:
@@ -95,13 +98,16 @@ async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> Lin
     try:
         cached_link = await link_cache.get_cached_link_by_slug(cache, slug)
     except RedisError:
+        logger.warning("redis.get_cached_link_failed", exc_info=True)
         cached_link = None
 
     if cached_link is None:
         link = await _get_link(session, slug)
         cached_link = LinkCache.from_link(link)
-        with contextlib.suppress(RedisError):
+        try:
             await link_cache.add_cached_link(cache, cached_link)
+        except RedisError:
+            logger.warning("redis.add_cached_link_failed", exc_info=True)
 
     if cached_link.status == LinkStatus.DISABLED:
         raise LinkDisabledError(slug=cached_link.slug)
@@ -151,8 +157,10 @@ async def update_link(session: AsyncSession, cache: Redis, slug: str, link_updat
         await session.rollback()
         raise
 
-    with contextlib.suppress(RedisError):
+    try:
         await link_cache.set_cached_link_invalidated(cache, slug)
+    except RedisError:
+        logger.warning("redis.set_cached_link_invalidation_failed", exc_info=True)
     return link
 
 
@@ -167,8 +175,10 @@ async def delete_link(session: AsyncSession, cache: Redis, slug: str, user: User
         await session.rollback()
         raise
 
-    with contextlib.suppress(RedisError):
+    try:
         await link_cache.set_cached_link_invalidated(cache, slug)
+    except RedisError:
+        logger.warning("redis.set_cached_link_invalidation_failed", exc_info=True)
 
 
 async def generate_link_qr_code(session: AsyncSession, slug: str, user: User) -> bytes:
