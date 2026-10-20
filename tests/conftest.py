@@ -213,8 +213,8 @@ class FakeGeoipReader:
         ipaddress.ip_address(ip_address)
         try:
             iso_code = self._country_code_by_ip[ip_address]
-        except KeyError as error:
+        except KeyError as key_error:
             message = f"The address {ip_address} is not in the database."
-            raise AddressNotFoundError(message) from error
+            raise AddressNotFoundError(message) from key_error
         # Mirror the shape geoip2 returns, which production reads as `response.country.iso_code`.
         return SimpleNamespace(country=SimpleNamespace(iso_code=iso_code))

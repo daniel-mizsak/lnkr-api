@@ -23,19 +23,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def test_health_check__healthy_dependencies(client: AsyncClient) -> None:
-    response = await client.get(url="/health")
-
-    assert response.status_code == status.HTTP_200_OK
-
-    data = response.json()
-
-    assert data["message"] == "lnkr api running"
-    assert data["environment"] == ApplicationEnvironment.DEVELOPMENT
-    assert data["database"] is True
-    assert data["cache"] is True
-
-
 async def test_health_check__database_failure(
     client: AsyncClient,
     session: AsyncSession,
@@ -100,3 +87,16 @@ async def test_health_check__redis_ping_false(client: AsyncClient, caplog: pytes
         (logging.ERROR, "redis.health_ping_failed")
     ]
     assert records[0].exc_info is None
+
+
+async def test_health_check__healthy_dependencies(client: AsyncClient) -> None:
+    response = await client.get(url="/health")
+
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+
+    assert data["message"] == "lnkr api running"
+    assert data["environment"] == ApplicationEnvironment.DEVELOPMENT
+    assert data["database"] is True
+    assert data["cache"] is True

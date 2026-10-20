@@ -58,15 +58,11 @@ test *args:
 coverage:
     source ./deployment/.env.common && \
     source ./deployment/.env.development && \
-    uv run coverage run --source=tests --module pytest
-    uv run coverage report --fail-under=100 --show-missing
-
-    source ./deployment/.env.common && \
-    source ./deployment/.env.development && \
-    uv run coverage run --source=lnkr --module pytest
-    uv run coverage report --show-missing
-    uv run coverage xml -o .artifacts/coverage.xml
-    uv run coverage html -d .artifacts/htmlcov
+    uv run coverage run --source=tests,lnkr --module pytest
+    uv run coverage report --include='tests/*' --fail-under=100 --show-missing
+    uv run coverage report --include='src/lnkr/*' --show-missing
+    uv run coverage xml --include='src/lnkr/*' -o .artifacts/coverage.xml
+    uv run coverage html --include='src/lnkr/*' -d .artifacts/htmlcov
 
 [group("qa")]
 check-all: lint type coverage

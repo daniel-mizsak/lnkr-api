@@ -51,18 +51,6 @@ async def test_get_or_create_user_without_commit__existing_user_returned(
     assert existing_user.email == user.email
 
 
-async def test_get_or_create_user_without_commit__new_user_created(session: AsyncSession, email: str) -> None:
-    new_user_email = f"new_{email}"
-
-    async with session.begin():
-        created_user = await user_service.get_or_create_user_without_commit(session, UserCreate(email=new_user_email))
-
-    saved_user = await user_service.get_user_by_email(session, new_user_email)
-
-    assert saved_user.id == created_user.id
-    assert saved_user.email == new_user_email
-
-
 @pytest.mark.usefixtures("frozen_now")
 async def test_get_or_create_user_without_commit__conflict_preserves_outer_transaction(
     session: AsyncSession,
@@ -94,6 +82,18 @@ async def test_get_or_create_user_without_commit__conflict_preserves_outer_trans
     assert existing_user.id == user.id
     await session.refresh(login_token)
     assert login_token.used_at is not None
+
+
+async def test_get_or_create_user_without_commit__new_user_created(session: AsyncSession, email: str) -> None:
+    new_user_email = f"new_{email}"
+
+    async with session.begin():
+        created_user = await user_service.get_or_create_user_without_commit(session, UserCreate(email=new_user_email))
+
+    saved_user = await user_service.get_user_by_email(session, new_user_email)
+
+    assert saved_user.id == created_user.id
+    assert saved_user.email == new_user_email
 
 
 async def test_delete_user__user_does_not_exist(session: AsyncSession, user: User) -> None:

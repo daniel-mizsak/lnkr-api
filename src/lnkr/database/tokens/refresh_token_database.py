@@ -45,7 +45,7 @@ async def consume_refresh_token(session: AsyncSession, token_hash: str) -> Refre
     )
 
     result = await session.execute(statement)
-    return result.scalars().first()
+    return result.scalar_one_or_none()
 
 
 async def revoke_refresh_token(session: AsyncSession, token_hash: str) -> RefreshToken | None:
@@ -65,7 +65,7 @@ async def revoke_refresh_token(session: AsyncSession, token_hash: str) -> Refres
     )
 
     result = await session.execute(statement)
-    return result.scalars().first()
+    return result.scalar_one_or_none()
 
 
 async def clean_up_refresh_tokens(session: AsyncSession) -> None:

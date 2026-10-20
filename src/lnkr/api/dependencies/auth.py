@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from lnkr.models import User
 
 logger = logging.getLogger(__name__)
-
 security = HTTPBearer(auto_error=False)
 
 
@@ -46,15 +45,15 @@ async def get_current_user(
 
     try:
         access_token_payload = decode_access_token(token)
-    except jwt.InvalidTokenError as error:
+    except jwt.InvalidTokenError as invalid_token_error:
         logger.info("auth.access_token_invalid")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from invalid_token_error
 
     try:
         user_id = uuid.UUID(access_token_payload.sub)
-    except ValueError as error:
+    except ValueError as value_error:
         logger.info("auth.access_token_subject_invalid")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from value_error
 
     try:
         return await get_user_by_id(session, user_id)

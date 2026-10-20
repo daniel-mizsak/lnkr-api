@@ -22,31 +22,24 @@ if TYPE_CHECKING:
     from httpx2 import AsyncClient
 
 
-async def test_list_clicks__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
-    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
+async def test_list_clicks__cursor_too_long(client: AsyncClient, slug: str, target_url: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    response = await client.get(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
+        params={"cursor": "a" * (CLICK_CURSOR_MAX_LENGTH + 1)},
+    )
 
-    data = response.json()
-    error = data["detail"][0]
-    assert error["type"] == "slug_does_not_exist"
-
-
-async def test_list_clicks__slug_not_owned_by_user(client: AsyncClient, slug: str) -> None:
-    with mock.patch.object(
-        click_route,
-        "get_link_validate_user",
-        mock.AsyncMock(side_effect=SlugNotOwnedByUserError(slug)),
-    ):
-        response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
-
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     data = response.json()
     error = data["detail"][0]
-    assert error["input"] == slug
-    assert error["loc"] == ["path", "slug"]
-    assert error["type"] == "slug_not_owned_by_user"
+
+    assert error["loc"] == ["query", "cursor"]
+    assert error["type"] == "string_too_long"
 
 
 async def test_list_clicks__invalid_cursor(client: AsyncClient, slug: str, target_url: str) -> None:
@@ -64,26 +57,37 @@ async def test_list_clicks__invalid_cursor(client: AsyncClient, slug: str, targe
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["type"] == "cursor_invalid"
 
 
-async def test_list_clicks__cursor_too_long(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
+async def test_list_clicks__slug_does_not_exist(client: AsyncClient, slug: str) -> None:
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
 
-    response = await client.get(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
-        params={"cursor": "a" * (CLICK_CURSOR_MAX_LENGTH + 1)},
-    )
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
     data = response.json()
     error = data["detail"][0]
-    assert error["loc"] == ["query", "cursor"]
-    assert error["type"] == "string_too_long"
+
+    assert error["type"] == "slug_does_not_exist"
+
+
+async def test_list_clicks__slug_not_owned_by_user(client: AsyncClient, slug: str) -> None:
+    with mock.patch.object(
+        click_route,
+        "get_link_validate_user",
+        mock.AsyncMock(side_effect=SlugNotOwnedByUserError(slug)),
+    ):
+        response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["input"] == slug
+    assert error["loc"] == ["path", "slug"]
+    assert error["type"] == "slug_not_owned_by_user"
 
 
 @pytest.mark.usefixtures("frozen_now")

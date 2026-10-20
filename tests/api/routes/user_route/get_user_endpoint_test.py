@@ -20,6 +20,7 @@ async def test_get_user__authenticated_user(client: AsyncClient) -> None:
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
+
     assert set(data.keys()) == {"email", "status"}
     assert data["email"] == "user@example.com"
     assert data["status"] == "regular"

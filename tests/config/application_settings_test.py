@@ -38,10 +38,12 @@ def test_application_settings__default_values() -> None:
     # API
     assert application_settings.API_VERSION == "v1"
     assert application_settings.API_VERSION_PREFIX == "/v1"
+
     assert application_settings.AUTH_PREFIX == "/auth"
-    assert application_settings.FORWARD_PREFIX == "/forward"
-    assert application_settings.LINKS_PREFIX == "/links"
     assert application_settings.USER_PREFIX == "/user"
+
+    assert application_settings.LINKS_PREFIX == "/links"
+    assert application_settings.FORWARD_PREFIX == "/forward"
 
     # SMTP
     assert application_settings.FROM_EMAIL == "hello@lnkr.by"

@@ -15,35 +15,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def test_list_clicks_by_link__cursor_pagination_uses_id_to_break_timestamp_ties(
-    session: AsyncSession,
-    link: Link,
-    now: datetime,
-) -> None:
-    session.add(link)
-    await session.flush()
-
-    click_ids = [uuid.UUID(int=value) for value in range(1, 4)]
-    session.add_all(
-        Click(
-            id=click_id,
-            timestamp=now,
-            source=ClickSource.LNKR_APP,
-            link_id=link.id,
-        )
-        for click_id in click_ids
-    )
-    await session.commit()
-
-    first_page = await click_database.list_clicks_by_link(session, link, limit=2, cursor=None)
-
-    cursor = ClickCursor.from_click(first_page[-1])
-    second_page = await click_database.list_clicks_by_link(session, link, limit=2, cursor=cursor)
-
-    assert [click.id for click in first_page] == [click_ids[2], click_ids[1]]
-    assert [click.id for click in second_page] == [click_ids[0]]
-
-
 async def test_list_clicks_by_link__filters_by_link_and_optional_sources(
     session: AsyncSession,
     link: Link,
@@ -100,6 +71,46 @@ async def test_list_clicks_by_link__filters_by_link_and_optional_sources(
     assert no_clicks == []
 
 
+async def test_list_clicks_by_link__cursor_pagination_uses_id_to_break_timestamp_ties(
+    session: AsyncSession,
+    link: Link,
+    now: datetime,
+) -> None:
+    session.add(link)
+    await session.flush()
+
+    click_ids = [uuid.UUID(int=value) for value in range(1, 4)]
+    session.add_all(
+        Click(
+            id=click_id,
+            timestamp=now,
+            source=ClickSource.LNKR_APP,
+            link_id=link.id,
+        )
+        for click_id in click_ids
+    )
+    await session.commit()
+
+    first_page = await click_database.list_clicks_by_link(session, link, limit=2, cursor=None)
+
+    cursor = ClickCursor.from_click(first_page[-1])
+    second_page = await click_database.list_clicks_by_link(session, link, limit=2, cursor=cursor)
+
+    assert [click.id for click in first_page] == [click_ids[2], click_ids[1]]
+    assert [click.id for click in second_page] == [click_ids[0]]
+
+
+async def test_count_clicks_by_links__empty_collection(session: AsyncSession, link: Link, now: datetime) -> None:
+    session.add(link)
+    await session.flush()
+    session.add(Click(timestamp=now, source=ClickSource.LNKR_APP, link_id=link.id))
+    await session.commit()
+
+    counts = await click_database.count_clicks_by_links(session, [])
+
+    assert counts == {}
+
+
 async def test_count_clicks_by_links__counts_only_lnkr_app_clicks(
     session: AsyncSession,
     link: Link,
@@ -123,15 +134,15 @@ async def test_count_clicks_by_links__counts_only_lnkr_app_clicks(
     assert counts == {link.id: 2}
 
 
-async def test_count_clicks_by_links__empty_collection(session: AsyncSession, link: Link, now: datetime) -> None:
+async def test_count_clicks_by_periods__empty_collection(session: AsyncSession, link: Link, now: datetime) -> None:
     session.add(link)
     await session.flush()
     session.add(Click(timestamp=now, source=ClickSource.LNKR_APP, link_id=link.id))
     await session.commit()
 
-    counts = await click_database.count_clicks_by_links(session, [])
+    counts = await click_database.count_clicks_by_periods(session, link, [])
 
-    assert counts == {}
+    assert counts == []
 
 
 async def test_count_clicks_by_periods__uses_half_open_ranges_and_lnkr_app_source(
@@ -162,17 +173,6 @@ async def test_count_clicks_by_periods__uses_half_open_ranges_and_lnkr_app_sourc
     counts = await click_database.count_clicks_by_periods(session, link, periods)
 
     assert counts == [3, 1]  # [1, 2, 3], [2]
-
-
-async def test_count_clicks_by_periods__empty_collection(session: AsyncSession, link: Link, now: datetime) -> None:
-    session.add(link)
-    await session.flush()
-    session.add(Click(timestamp=now, source=ClickSource.LNKR_APP, link_id=link.id))
-    await session.commit()
-
-    counts = await click_database.count_clicks_by_periods(session, link, [])
-
-    assert counts == []
 
 
 async def test_list_daily_click_counts__groups_by_timezone_local_date(session: AsyncSession, link: Link) -> None:
@@ -217,6 +217,20 @@ async def test_list_daily_click_counts__groups_by_timezone_local_date(session: A
     }
 
 
+async def test_list_top_country_click_counts__no_clicks_in_period(session: AsyncSession, link: Link) -> None:
+    session.add(link)
+    await session.flush()
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    session.add(Click(timestamp=start, source=ClickSource.LNKR_APP, country_code="US", link_id=link.id))
+    await session.commit()
+    period = ClickAnalyticsTimeRange(start=start + timedelta(days=1), end=start + timedelta(days=2))
+
+    count, countries = await click_database.list_top_country_click_counts(session, link, period, limit=1)
+
+    assert count == 0
+    assert countries == []
+
+
 async def test_list_top_country_click_counts__returns_limited_rows_and_all_known_clicks(
     session: AsyncSession,
     link: Link,
@@ -248,17 +262,3 @@ async def test_list_top_country_click_counts__returns_limited_rows_and_all_known
 
     assert known_country_click_count == 3  # 1, 2, 3
     assert top_country_counts == [("US", 2)]  # 1, 2
-
-
-async def test_list_top_country_click_counts__no_clicks_in_period(session: AsyncSession, link: Link) -> None:
-    session.add(link)
-    await session.flush()
-    start = datetime(2026, 1, 1, tzinfo=UTC)
-    session.add(Click(timestamp=start, source=ClickSource.LNKR_APP, country_code="US", link_id=link.id))
-    await session.commit()
-    period = ClickAnalyticsTimeRange(start=start + timedelta(days=1), end=start + timedelta(days=2))
-
-    count, countries = await click_database.list_top_country_click_counts(session, link, period, limit=1)
-
-    assert count == 0
-    assert countries == []

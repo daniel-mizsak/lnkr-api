@@ -95,22 +95,6 @@ async def test_get_current_user__invalid_subject_is_unauthorized(
     assert caplog.record_tuples == [(auth.__name__, logging.INFO, "auth.access_token_subject_invalid")]
 
 
-async def test_get_current_user__loads_token_user(user: User, now: datetime) -> None:
-    session = mock.AsyncMock()
-    payload = AccessTokenPayload(sub=str(user.id), iat=now, exp=now + timedelta(minutes=1), type="access")
-    get_user_by_id = mock.AsyncMock(return_value=user)
-    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
-
-    with (
-        mock.patch.object(auth, "decode_access_token", mock.Mock(return_value=payload)),
-        mock.patch.object(auth, "get_user_by_id", get_user_by_id),
-    ):
-        current_user = await auth.get_current_user(credentials, session)
-
-    assert current_user is user
-    get_user_by_id.assert_awaited_once_with(session, user.id)
-
-
 async def test_get_current_user__missing_token_user_maps_domain_error(
     user_id: uuid.UUID,
     now: datetime,
@@ -134,3 +118,19 @@ async def test_get_current_user__missing_token_user_maps_domain_error(
     assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
     assert exc_info.value.detail[0]["type"] == "user_does_not_exist"  # ty: ignore[invalid-argument-type]
     assert caplog.record_tuples == [(auth.__name__, logging.INFO, "auth.access_token_user_missing")]
+
+
+async def test_get_current_user__loads_token_user(user: User, now: datetime) -> None:
+    session = mock.AsyncMock()
+    payload = AccessTokenPayload(sub=str(user.id), iat=now, exp=now + timedelta(minutes=1), type="access")
+    get_user_by_id = mock.AsyncMock(return_value=user)
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
+
+    with (
+        mock.patch.object(auth, "decode_access_token", mock.Mock(return_value=payload)),
+        mock.patch.object(auth, "get_user_by_id", get_user_by_id),
+    ):
+        current_user = await auth.get_current_user(credentials, session)
+
+    assert current_user is user
+    get_user_by_id.assert_awaited_once_with(session, user.id)

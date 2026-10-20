@@ -30,18 +30,6 @@ def test_create_and_decode_access_token__round_trip(user_id: uuid.UUID, now: dat
 
 
 @pytest.mark.usefixtures("frozen_now")
-def test_decode_access_token__wrong_token_type(user_id: uuid.UUID, now: datetime) -> None:
-    token = jwt.encode(
-        {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=1), "type": "refresh"},
-        key=application_settings.ACCESS_TOKEN_SECRET_KEY.get_secret_value(),
-        algorithm=application_settings.ACCESS_TOKEN_ALGORITHM,
-    )
-
-    with pytest.raises(jwt.InvalidTokenError):
-        decode_access_token(token)
-
-
-@pytest.mark.usefixtures("frozen_now")
 def test_decode_access_token__invalid_signature(user_id: uuid.UUID, now: datetime) -> None:
     token = jwt.encode(
         {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=1), "type": "access"},
@@ -81,4 +69,16 @@ def test_decode_access_token__expired_token(user_id: uuid.UUID, elapsed: timedel
     )
 
     with time_machine.travel(expires_at + elapsed, tick=False), pytest.raises(jwt.ExpiredSignatureError):
+        decode_access_token(token)
+
+
+@pytest.mark.usefixtures("frozen_now")
+def test_decode_access_token__wrong_token_type(user_id: uuid.UUID, now: datetime) -> None:
+    token = jwt.encode(
+        {"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=1), "type": "refresh"},
+        key=application_settings.ACCESS_TOKEN_SECRET_KEY.get_secret_value(),
+        algorithm=application_settings.ACCESS_TOKEN_ALGORITHM,
+    )
+
+    with pytest.raises(jwt.InvalidTokenError):
         decode_access_token(token)

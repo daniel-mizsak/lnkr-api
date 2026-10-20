@@ -28,28 +28,81 @@ async def test_forward_to_target_url__slug_does_not_exist(client: AsyncClient, s
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' does not exist"
     assert error["type"] == "slug_does_not_exist"
 
 
-async def test_forward_to_target_url__active_link(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-) -> None:
+async def test_forward_to_target_url__disabled_link(client: AsyncClient, slug: str, target_url: str) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
+    await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"status": "disabled"},
+    )
 
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
+    assert response.status_code == status.HTTP_410_GONE
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["type"] == "link_disabled"
+
+
+async def test_forward_to_target_url__expired_link(client: AsyncClient, slug: str, target_url: str) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
+    )
+
+    with time_machine.travel(expires_at, tick=False):
+        response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+
+    assert response.status_code == status.HTTP_410_GONE
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["type"] == "link_expired"
+
+
+async def test_forward_to_target_url__password_required(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    password: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "password": password},
+    )
+
+    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.headers["Cache-Control"] == "no-store"
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["msg"] == f"Link with slug '{slug}' requires a password"
+    assert error["type"] == "link_password_required"
+
+    # No click recorded.
+    response = await client.get(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
+    )
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    assert data["target_url"] == target_url
+    assert data["items"] == []
 
 
 @pytest.mark.parametrize(
@@ -110,6 +163,7 @@ async def test_forward_to_target_url__geoip_database_unavailable(
 
     data = response.json()
     clicks = data["items"]
+
     assert len(clicks) == 1
     assert clicks[0]["ip_address"] == ip_address_public
     assert clicks[0]["country_code"] is None
@@ -172,75 +226,18 @@ async def test_forward_to_target_url__click_source(
     assert click_sources == [ClickSource.PUBLIC_API, ClickSource.PUBLIC_API, ClickSource.LNKR_APP]
 
 
-async def test_forward_to_target_url__disabled_link(client: AsyncClient, slug: str, target_url: str) -> None:
+async def test_forward_to_target_url__active_link(client: AsyncClient, slug: str, target_url: str) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
         json={"slug": slug, "target_url": target_url},
     )
-    await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"status": "disabled"},
-    )
 
     response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
 
-    assert response.status_code == status.HTTP_410_GONE
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["type"] == "link_disabled"
-
-
-async def test_forward_to_target_url__expired_link(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-) -> None:
-    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
-    )
-
-    with time_machine.travel(expires_at, tick=False):
-        response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-
-    assert response.status_code == status.HTTP_410_GONE
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["type"] == "link_expired"
-
-
-async def test_forward_to_target_url__password_required(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-    password: str,
-) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "password": password},
-    )
-
-    response = await client.get(url=f"{application_settings.FORWARD_PREFIX}/{slug}")
-
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.headers["Cache-Control"] == "no-store"
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["msg"] == f"Link with slug '{slug}' requires a password"
-    assert error["type"] == "link_password_required"
-
-    # No click recorded.
-    response = await client.get(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks",
-    )
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    assert data["items"] == []
+    assert data["target_url"] == target_url
 
 
 async def test_forward_to_target_url__expired_link_with_extended_expiry(

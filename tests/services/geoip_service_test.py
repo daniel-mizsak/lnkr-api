@@ -14,6 +14,24 @@ if TYPE_CHECKING:
     from geoip2.database import Reader
 
 
+def test_get_country_code_from_ip__missing_ip(geoip_reader: Reader) -> None:
+    country_code = get_country_code_from_ip(geoip_reader, None)
+
+    assert country_code is None
+
+
+def test_get_country_code_from_ip__empty_string(geoip_reader: Reader) -> None:
+    country_code = get_country_code_from_ip(geoip_reader, "")
+
+    assert country_code is None
+
+
+def test_get_country_code_from_ip__geoip_database_unavailable(ip_address_public: str) -> None:
+    country_code = get_country_code_from_ip(None, ip_address_public)
+
+    assert country_code is None
+
+
 def test_get_country_code_from_ip__public_ip(
     geoip_reader: Reader,
     ip_address_public: str,
@@ -33,24 +51,6 @@ def test_get_country_code_from_ip__private_ip(geoip_reader: Reader, ip_address_p
 
 def test_get_country_code_from_ip__malformed_ip(geoip_reader: Reader, ip_address_malformed: str) -> None:
     country_code = get_country_code_from_ip(geoip_reader, ip_address_malformed)
-
-    assert country_code is None
-
-
-def test_get_country_code_from_ip__missing_ip(geoip_reader: Reader) -> None:
-    country_code = get_country_code_from_ip(geoip_reader, None)
-
-    assert country_code is None
-
-
-def test_get_country_code_from_ip__empty_string(geoip_reader: Reader) -> None:
-    country_code = get_country_code_from_ip(geoip_reader, "")
-
-    assert country_code is None
-
-
-def test_get_country_code_from_ip__geoip_database_unavailable(ip_address_public: str) -> None:
-    country_code = get_country_code_from_ip(None, ip_address_public)
 
     assert country_code is None
 

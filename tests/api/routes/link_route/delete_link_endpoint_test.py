@@ -25,6 +25,7 @@ async def test_delete_link__slug_does_not_exist(client: AsyncClient, slug: str) 
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' does not exist"
@@ -51,6 +52,7 @@ async def test_delete_link__slug_not_owned_by_user(
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' is not owned by the current user"

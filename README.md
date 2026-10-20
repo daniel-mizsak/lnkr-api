@@ -85,18 +85,22 @@ just deploy-production
 
 - Improve rate limiting for login token requests and verification, refresh token rotation, and password-protected link unlocking. Add per-email send limits and verify that client identification works through the production proxy and frontend.
 - Rehearse restoring an encrypted backup and document deployment, recovery, and rollback steps. Use the same pinned release image for the application and database migrations instead of `latest`.
+- Update versioning to use header instead of /v1 versioning.
 
 #### Features
 
 - Add sorting links by click count.
 - Add a callback URL to the request login token endpoint and include it in the login URL, restricting destinations to approved frontend locations.
 - Send email to confirm account deletion, with a link that calls the account deletion endpoint and redirects to a success page.
+- Allow users to reset click data for their links.
 
 #### Codebase and infrastructure improvements
 
 - Move login email sending and retries to a durable background worker so requests do not wait for SMTP. Save the token and email job together using a transactional outbox, return `202 Accepted` after committing, and preserve idempotency and token expiry handling across retries.
 - Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
+- Unify and improve header policies (such as `Cache-Control`). Coordinate API policies with Next.js server-side caching and browser-facing responses.
 - Add dedicated concurrency tests with separate database sessions and controlled synchronization to verify race-condition handling for login token consumption, user creation, refresh token rotation, and user link limits.
+- Add test to validate database migrations.
 - Automate staging deployment when a GitHub push occurs to the main branch and production deployment when a release is created.
 - Use `secrets_dir="/run/secrets"` for Docker secrets in production.
 

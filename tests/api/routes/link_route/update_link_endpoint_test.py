@@ -30,10 +30,102 @@ async def test_update_link__invalid_target_url(client: AsyncClient, slug: str, t
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == target_url_invalid
     assert error["loc"] == ["body", "target_url"]
     assert error["msg"] == "Input should be a valid URL, relative URL without a base"
     assert error["type"] == "url_parsing"
+
+
+async def test_update_link__timezone_required(client: AsyncClient, slug: str, target_url: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": "2026-12-31T12:00:00"},
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["loc"] == ["body", "expires_at"]
+    assert error["msg"] == "Input should have timezone info"
+    assert error["type"] == "timezone_aware"
+
+
+async def test_update_link__unknown_field(client: AsyncClient, slug: str, target_url: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"taget_url": target_url},
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["loc"] == ["body", "taget_url"]
+    assert error["type"] == "extra_forbidden"
+
+
+async def test_update_link__empty_body(client: AsyncClient, slug: str, target_url: str) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={},
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["input"] == {}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == "Value error, At least one field must be provided"
+    assert error["type"] == "value_error"
+
+
+@pytest.mark.parametrize("field", ["target_url", "status", "favorite"])
+async def test_update_link__non_nullable_field_cleared(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    field: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={field: None},
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["input"] == {field: None}
+    assert error["loc"] == ["body"]
+    assert error["msg"] == f"Value error, {field} cannot be cleared"
+    assert error["type"] == "value_error"
 
 
 async def test_update_link__slug_does_not_exist(client: AsyncClient, slug: str, target_url: str) -> None:
@@ -46,6 +138,7 @@ async def test_update_link__slug_does_not_exist(client: AsyncClient, slug: str, 
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' does not exist"
@@ -75,50 +168,11 @@ async def test_update_link__slug_not_owned_by_user(
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' is not owned by the current user"
     assert error["type"] == "slug_not_owned_by_user"
-
-
-async def test_update_link__unknown_field(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"taget_url": target_url},
-    )
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["loc"] == ["body", "taget_url"]
-    assert error["type"] == "extra_forbidden"
-
-
-async def test_update_link__empty_body(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={},
-    )
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["input"] == {}
-    assert error["loc"] == ["body"]
-    assert error["msg"] == "Value error, At least one field must be provided"
-    assert error["type"] == "value_error"
 
 
 async def test_update_link__target_url_changed(client: AsyncClient, slug: str, target_url: str) -> None:
@@ -138,12 +192,11 @@ async def test_update_link__target_url_changed(client: AsyncClient, slug: str, t
     assert data["target_url"] == target_url
 
 
-@pytest.mark.parametrize("field", ["target_url", "status", "favorite"])
-async def test_update_link__non_nullable_field_cleared(
+async def test_update_link__expiration_set(
     client: AsyncClient,
     slug: str,
     target_url: str,
-    field: str,
+    expires_at: datetime,
 ) -> None:
     await client.post(
         url=f"{application_settings.LINKS_PREFIX}",
@@ -152,17 +205,35 @@ async def test_update_link__non_nullable_field_cleared(
 
     response = await client.patch(
         url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={field: None},
+        json={"expires_at": expires_at.isoformat()},
     )
 
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    error = data["detail"][0]
-    assert error["input"] == {field: None}
-    assert error["loc"] == ["body"]
-    assert error["msg"] == f"Value error, {field} cannot be cleared"
-    assert error["type"] == "value_error"
+    assert datetime.fromisoformat(data["expires_at"]) == expires_at
+
+
+async def test_update_link__expiration_cleared(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    expires_at: datetime,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
+    )
+
+    response = await client.patch(
+        url=f"{application_settings.LINKS_PREFIX}/{slug}",
+        json={"expires_at": None},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert data["expires_at"] is None
 
 
 @pytest.mark.parametrize(("original_value", "updated_value"), [("active", "disabled"), ("disabled", "active")])
@@ -219,70 +290,6 @@ async def test_update_link__favorite_changed(
 
     data = response.json()
     assert data["favorite"] == updated_value
-
-
-async def test_update_link__expiration_set(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-    expires_at: datetime,
-) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": expires_at.isoformat()},
-    )
-
-    assert response.status_code == status.HTTP_200_OK
-
-    data = response.json()
-    assert datetime.fromisoformat(data["expires_at"]) == expires_at
-
-
-async def test_update_link__expiration_cleared(
-    client: AsyncClient,
-    slug: str,
-    target_url: str,
-    expires_at: datetime,
-) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url, "expires_at": expires_at.isoformat()},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": None},
-    )
-
-    assert response.status_code == status.HTTP_200_OK
-
-    data = response.json()
-    assert data["expires_at"] is None
-
-
-async def test_update_link__timezone_required(client: AsyncClient, slug: str, target_url: str) -> None:
-    await client.post(
-        url=f"{application_settings.LINKS_PREFIX}",
-        json={"slug": slug, "target_url": target_url},
-    )
-
-    response = await client.patch(
-        url=f"{application_settings.LINKS_PREFIX}/{slug}",
-        json={"expires_at": "2026-12-31T12:00:00"},
-    )
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-
-    data = response.json()
-    error = data["detail"][0]
-    assert error["loc"] == ["body", "expires_at"]
-    assert error["msg"] == "Input should have timezone info"
-    assert error["type"] == "timezone_aware"
 
 
 @pytest.mark.parametrize(

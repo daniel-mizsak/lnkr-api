@@ -137,10 +137,18 @@ def issue_auth_tokens_fixture(
 
 
 @pytest.fixture(name="requested_login_token")
-async def requested_login_token_fixture(request_login_token: RequestLoginTokenFunction, email: str) -> str:
+async def requested_login_token_fixture(
+    request_login_token: RequestLoginTokenFunction,
+    email: str,
+    frozen_now: None,  # noqa: ARG001
+) -> str:
     return await request_login_token(email)
 
 
 @pytest.fixture(name="issued_auth_tokens")
-async def issued_auth_tokens_fixture(issue_auth_tokens: IssueAuthTokensFunction, email: str) -> dict[str, str]:
+async def issued_auth_tokens_fixture(
+    issue_auth_tokens: IssueAuthTokensFunction,
+    email: str,
+    frozen_now: None,  # noqa: ARG001
+) -> dict[str, str]:
     return await issue_auth_tokens(email)

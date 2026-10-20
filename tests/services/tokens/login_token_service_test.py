@@ -53,6 +53,7 @@ async def test_create_and_save_login_token__generation_attempts_exhausted(
         )
 
 
+@pytest.mark.usefixtures("frozen_now")
 async def test_authenticate_with_login_token__user_does_not_exist(
     session: AsyncSession,
     user: User,
@@ -100,7 +101,9 @@ async def test_authenticate_with_login_token__expired_token_does_not_create_user
         await login_token_service.authenticate_with_login_token(session, login_token_value)
 
     assert await user_database.get_user_by_email(session, new_user_email) is None
+
     await session.refresh(login_token)
+
     assert login_token.used_at is None
     assert list((await session.scalars(select(RefreshToken.id))).all()) == []
 
@@ -142,9 +145,12 @@ async def test_authenticate_with_login_token__refresh_failure_rolls_back_all_cha
     async with session.begin():
         await session.refresh(login_token)
         saved_user = await user_database.get_user_by_email(session, new_user_email)
+
         assert login_token.used_at is None
         assert saved_user is None
+
         result = await session.execute(select(RefreshToken))
+
         assert result.scalars().all() == [conflicting_refresh_token]
 
     # Authenticate with the login token again to ensure that a new refresh token can be generated.
@@ -158,6 +164,7 @@ async def test_authenticate_with_login_token__refresh_failure_rolls_back_all_cha
             ),
         )
         refresh_token = result.scalar_one()
+
         assert login_token.used_at is not None
         assert user.email == new_user_email
         assert refresh_token.user_id == user.id

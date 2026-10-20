@@ -19,6 +19,30 @@ from lnkr.config.application_settings import ApplicationEnvironment, application
 from lnkr.services import email_service
 
 
+async def test_send_email__preserves_message_and_idempotency_key_across_retries() -> None:
+    message = MIMEMultipart()
+    message["Resend-Idempotency-Key"] = "login-token/test"
+    message.attach(MIMEText("Login token: ABC123", "html"))
+    payloads: list[bytes] = []
+    send = mock.Mock(side_effect=[TimeoutError("Timed out"), None])
+
+    def send_email_sync(message: MIMEMultipart) -> None:
+        # Serialize a copy, as smtplib.send_message does, to catch regenerated MIME boundaries.
+        payload = copy.copy(message).as_bytes()
+        payloads.append(payload)
+        send(payload)
+
+    with (
+        mock.patch.object(email_service, "_send_email_sync", side_effect=send_email_sync),
+        mock.patch.object(email_service, "sleep", mock.AsyncMock()),
+    ):
+        await email_service.send_email(message)
+
+    assert len(payloads) == 2
+    assert payloads[0] == payloads[1]
+    assert b"Resend-Idempotency-Key: login-token/test" in payloads[0]
+
+
 async def test_send_email__offloads_blocking_smtp_call() -> None:
     message = MIMEMultipart()
     run_sync = mock.AsyncMock()
@@ -29,64 +53,24 @@ async def test_send_email__offloads_blocking_smtp_call() -> None:
     run_sync.assert_awaited_once_with(email_service._send_email_sync, message)  # noqa: SLF001
 
 
-@pytest.mark.parametrize(
-    "send_error",
-    [
-        pytest.param(smtplib.SMTPDataError(451, b"Try again later"), id="message-rejected"),
-        pytest.param(
-            smtplib.SMTPRecipientsRefused({"user@example.com": (450, b"Try again later")}),
-            id="recipient-unavailable",
-        ),
-        pytest.param(smtplib.SMTPServerDisconnected("Disconnected"), id="smtp-disconnected"),
-        pytest.param(ConnectionRefusedError("Connection refused"), id="connection-refused"),
-        pytest.param(TimeoutError("Timed out"), id="timeout"),
-        pytest.param(socket.gaierror(socket.EAI_AGAIN, "Temporary DNS failure"), id="temporary-dns-failure"),
-    ],
-)
-async def test_send_email__retries_transient_failure(send_error: OSError, caplog: pytest.LogCaptureFixture) -> None:
+async def test_send_email__does_not_retry_unexpected_failure(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
-    run_sync = mock.AsyncMock(side_effect=[send_error, None])
-    sleep = mock.AsyncMock()
-
-    with (
-        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
-        mock.patch.object(email_service, "sleep", sleep),
-    ):
-        await email_service.send_email(message)
-
-    assert run_sync.await_count == 2
-    sleep.assert_awaited_once()
-    assert caplog.record_tuples == [(email_service.__name__, logging.WARNING, "email.retrying")]
-    assert caplog.records[0].exc_info is not None
-    assert caplog.records[0].exc_info[1] is send_error
-
-
-async def test_send_email__exhausted_sending_attempts(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger=email_service.__name__)
-    message = MIMEMultipart()
-    send_error = TimeoutError("Timed out")
+    send_error = ValueError("Unexpected error")
     run_sync = mock.AsyncMock(side_effect=send_error)
     sleep = mock.AsyncMock()
 
     with (
         mock.patch.object(email_service.to_thread, "run_sync", run_sync),
         mock.patch.object(email_service, "sleep", sleep),
-        mock.patch.object(email_service.random, "uniform", side_effect=[0.25, 0.5]),
-        pytest.raises(TimeoutError) as exc_info,
+        pytest.raises(ValueError, match="Unexpected error") as exc_info,
     ):
         await email_service.send_email(message)
-    logged_errors = [record.exc_info[1] for record in caplog.records if record.exc_info is not None]
 
     assert exc_info.value is send_error
-    assert run_sync.await_count == 3
-    assert sleep.await_args_list == [mock.call(1.25), mock.call(2.5)]  # 1 + 0.25, 2 + 0.5
-    assert caplog.record_tuples == [
-        (email_service.__name__, logging.WARNING, "email.retrying"),
-        (email_service.__name__, logging.WARNING, "email.retrying"),
-        (email_service.__name__, logging.ERROR, "email.retries_exhausted"),
-    ]
-    assert logged_errors == [send_error] * 3
+    run_sync.assert_awaited_once()
+    sleep.assert_not_awaited()
+    assert caplog.record_tuples == []
 
 
 @pytest.mark.parametrize(
@@ -125,48 +109,64 @@ async def test_send_email__does_not_retry_non_retryable_failure(
     assert caplog.records[0].exc_info[1] is send_error
 
 
-async def test_send_email__does_not_retry_unexpected_failure(caplog: pytest.LogCaptureFixture) -> None:
+async def test_send_email__exhausted_sending_attempts(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
-    send_error = ValueError("Unexpected error")
+    send_error = TimeoutError("Timed out")
     run_sync = mock.AsyncMock(side_effect=send_error)
     sleep = mock.AsyncMock()
 
     with (
         mock.patch.object(email_service.to_thread, "run_sync", run_sync),
         mock.patch.object(email_service, "sleep", sleep),
-        pytest.raises(ValueError, match="Unexpected error") as exc_info,
+        mock.patch.object(email_service.random, "uniform", side_effect=[0.25, 0.5]),
+        pytest.raises(TimeoutError) as exc_info,
     ):
         await email_service.send_email(message)
+    logged_errors = [record.exc_info[1] for record in caplog.records if record.exc_info is not None]
 
     assert exc_info.value is send_error
-    run_sync.assert_awaited_once()
-    sleep.assert_not_awaited()
-    assert caplog.record_tuples == []
+    assert run_sync.await_count == 3
+    assert sleep.await_args_list == [mock.call(1.25), mock.call(2.5)]  # 1 + 0.25, 2 + 0.5
+    assert caplog.record_tuples == [
+        (email_service.__name__, logging.WARNING, "email.retrying"),
+        (email_service.__name__, logging.WARNING, "email.retrying"),
+        (email_service.__name__, logging.ERROR, "email.retries_exhausted"),
+    ]
+    assert logged_errors == [send_error] * 3
 
 
-async def test_send_email__preserves_message_and_idempotency_key_across_retries() -> None:
+@pytest.mark.parametrize(
+    "send_error",
+    [
+        pytest.param(smtplib.SMTPDataError(451, b"Try again later"), id="message-rejected"),
+        pytest.param(
+            smtplib.SMTPRecipientsRefused({"user@example.com": (450, b"Try again later")}),
+            id="recipient-unavailable",
+        ),
+        pytest.param(smtplib.SMTPServerDisconnected("Disconnected"), id="smtp-disconnected"),
+        pytest.param(ConnectionRefusedError("Connection refused"), id="connection-refused"),
+        pytest.param(TimeoutError("Timed out"), id="timeout"),
+        pytest.param(socket.gaierror(socket.EAI_AGAIN, "Temporary DNS failure"), id="temporary-dns-failure"),
+    ],
+)
+async def test_send_email__retries_transient_failure(send_error: OSError, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO, logger=email_service.__name__)
     message = MIMEMultipart()
-    message["Resend-Idempotency-Key"] = "login-token/test"
-    message.attach(MIMEText("Login token: ABC123", "html"))
-    payloads: list[bytes] = []
-    send = mock.Mock(side_effect=[TimeoutError("Timed out"), None])
-
-    def send_email_sync(message: MIMEMultipart) -> None:
-        # Serialize a copy, as smtplib.send_message does, to catch regenerated MIME boundaries.
-        payload = copy.copy(message).as_bytes()
-        payloads.append(payload)
-        send(payload)
+    run_sync = mock.AsyncMock(side_effect=[send_error, None])
+    sleep = mock.AsyncMock()
 
     with (
-        mock.patch.object(email_service, "_send_email_sync", side_effect=send_email_sync),
-        mock.patch.object(email_service, "sleep", mock.AsyncMock()),
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
     ):
         await email_service.send_email(message)
 
-    assert len(payloads) == 2
-    assert payloads[0] == payloads[1]
-    assert b"Resend-Idempotency-Key: login-token/test" in payloads[0]
+    assert run_sync.await_count == 2
+    sleep.assert_awaited_once()
+    assert caplog.record_tuples == [(email_service.__name__, logging.WARNING, "email.retrying")]
+    assert caplog.records[0].exc_info is not None
+    assert caplog.records[0].exc_info[1] is send_error
 
 
 @pytest.mark.parametrize(

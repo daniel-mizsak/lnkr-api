@@ -29,6 +29,7 @@ async def test_delete_user__user_does_not_exist(client: AsyncClient) -> None:
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["type"] == "user_does_not_exist"
 
 
@@ -155,6 +156,7 @@ async def test_delete_user__access_token_rejected_after_deletion(
 
     data = deleted_user_response.json()
     error = data["detail"][0]
+
     assert error["type"] == "user_does_not_exist"
     assert other_user_response.status_code == status.HTTP_200_OK
 

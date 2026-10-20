@@ -31,6 +31,7 @@ async def test_generate_random_slug__generation_failure(client: AsyncClient) -> 
 
     data = response.json()
     error = data["detail"][0]
+
     assert error["msg"] == "Unable to generate an unused random slug. Please try again."
     assert error["type"] == "random_slug_generation_failed"
 

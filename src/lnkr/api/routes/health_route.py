@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 

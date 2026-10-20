@@ -79,6 +79,7 @@ async def test_rotate_refresh_token__replacement_failure_preserves_original_toke
 
     async with session.begin():
         await session.refresh(refresh_token)
+
         assert refresh_token.used_at is None
 
     # The failed rotation must leave the original token consumable.
