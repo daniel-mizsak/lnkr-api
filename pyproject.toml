@@ -11,7 +11,7 @@
   authors = [{ name = "Daniel Mizsak", email = "daniel@mizsak.com" }]
   requires-python = ">=3.14"
   dependencies = [
-    "PyJWT==2.13.0",
+    "PyJWT==2.15.0",
     "SQLAlchemy[asyncio]==2.0.52",
     "alembic[tz]==1.19.2",
     "anyio==4.15.1",
