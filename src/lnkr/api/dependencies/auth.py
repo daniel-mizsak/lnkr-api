@@ -41,13 +41,13 @@ async def get_current_user(
 
     try:
         access_token_payload = decode_access_token(token)
-    except jwt.InvalidTokenError as error:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
+    except jwt.InvalidTokenError as invalid_token_error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from invalid_token_error
 
     try:
         user_id = uuid.UUID(access_token_payload.sub)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from error
+    except ValueError as value_error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from value_error
 
     try:
         return await get_user_by_id(session, user_id)
