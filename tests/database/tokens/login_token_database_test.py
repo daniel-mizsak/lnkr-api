@@ -7,6 +7,8 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+import pytest
+import time_machine
 from sqlalchemy import select
 
 from lnkr.database.tokens import login_token_database
@@ -16,11 +18,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def test_consume_login_token__is_atomic_and_single_use(session: AsyncSession, email: str) -> None:
+@pytest.mark.usefixtures("frozen_now")
+async def test_consume_login_token__single_use(
+    session: AsyncSession,
+    email: str,
+    now: datetime,
+    expires_at: datetime,
+) -> None:
     login_token = LoginToken(
         token_hash="a" * 64,
         email=email,
-        expires_at=datetime.now(tz=UTC) + timedelta(minutes=1),
+        expires_at=expires_at,
     )
     session.add(login_token)
     await session.commit()
@@ -29,24 +37,52 @@ async def test_consume_login_token__is_atomic_and_single_use(session: AsyncSessi
     consumed_again = await login_token_database.consume_login_token(session, login_token.token_hash)
 
     assert consumed is not None
-    assert consumed.used_at is not None
+    assert consumed.used_at == now
     assert consumed_again is None
 
 
-async def test_consume_login_token__rejects_expired_token(session: AsyncSession, email: str) -> None:
-    login_token = LoginToken(
-        token_hash="b" * 64,
-        email=email,
-        expires_at=datetime.now(tz=UTC) - timedelta(seconds=1),
-    )
-    session.add(login_token)
+async def test_consume_login_token__immediately_before_expiration(
+    session: AsyncSession,
+    email: str,
+    expires_at: datetime,
+) -> None:
+    token = LoginToken(email=email, token_hash="a" * 64, expires_at=expires_at)
+    session.add(token)
     await session.commit()
 
-    assert await login_token_database.consume_login_token(session, login_token.token_hash) is None
+    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
+        consumed_token = await login_token_database.consume_login_token(session, token.token_hash)
+
+    assert consumed_token is token
 
 
-async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(session: AsyncSession, email: str) -> None:
-    now = datetime.now(tz=UTC)
+@pytest.mark.parametrize(
+    "elapsed",
+    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
+)
+async def test_consume_login_token__expired_token(session: AsyncSession, email: str, elapsed: timedelta) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    token = LoginToken(
+        email=email,
+        token_hash="a" * 64,
+        expires_at=expires_at,
+    )
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at + elapsed, tick=False):
+        consumed_token = await login_token_database.consume_login_token(session, token.token_hash)
+
+    assert consumed_token is None
+    await session.refresh(token)
+    assert token.used_at is None
+
+
+async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(
+    session: AsyncSession,
+    email: str,
+    now: datetime,
+) -> None:
     tokens = [
         LoginToken(token_hash="a" * 64, email=email, expires_at=now + timedelta(minutes=10)),
         LoginToken(token_hash="b" * 64, email=email, expires_at=now + timedelta(minutes=1), used_at=now),

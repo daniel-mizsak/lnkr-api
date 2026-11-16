@@ -44,7 +44,7 @@ async def consume_login_token(session: AsyncSession, token_hash: str) -> LoginTo
     )
 
     result = await session.execute(statement)
-    return result.scalars().first()
+    return result.scalar_one_or_none()
 
 
 async def delete_login_tokens_by_email(session: AsyncSession, email: str) -> None:

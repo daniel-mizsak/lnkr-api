@@ -12,8 +12,10 @@ from lnkr.config.application_settings import application_settings
 api_router = APIRouter()
 
 api_router.include_router(health_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["health"])
+
 api_router.include_router(auth_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["auth"])
-api_router.include_router(link_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["link"])
 api_router.include_router(user_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["user"])
+
+api_router.include_router(link_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["link"])
 api_router.include_router(click_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["click"])
 api_router.include_router(forward_route.router, prefix=application_settings.API_VERSION_PREFIX, tags=["forward"])

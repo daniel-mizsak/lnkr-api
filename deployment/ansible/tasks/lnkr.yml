@@ -11,7 +11,7 @@
   community.docker.docker_container:
     name: "{{ application_name }}-database-migration"
     image: ghcr.io/daniel-mizsak/lnkr-api:latest
-    command: ["bash", "scripts/run-database-migrations.sh"]
+    command: ["bash", "alembic/run-database-migrations.sh"]
     pull: always
     detach: false
     cleanup: true
