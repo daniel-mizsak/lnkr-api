@@ -105,6 +105,28 @@ class LoginTokenGenerationError(LnkrError):
         )
 
 
+class LoginTokenDeliveryError(LnkrError):
+    """Raised when the login token email cannot be sent."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        msg = "Unable to send a login token. Please request a new token in 60 seconds."
+        super().__init__(msg)
+
+    def raise_http_exception(self) -> NoReturn:
+        """Raise an http exception with retry guidance."""
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=[
+                {
+                    "msg": str(self),
+                    "type": "login_token_delivery_failed",
+                },
+            ],
+            headers=NO_STORE_HEADERS | {"Retry-After": "60"},
+        )
+
+
 class RefreshTokenInvalidError(LnkrError):
     """Raised when a refresh token is invalid, used, revoked or expired."""
 
