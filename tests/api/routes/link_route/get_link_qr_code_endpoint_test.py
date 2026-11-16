@@ -30,10 +30,12 @@ async def test_get_link_qr_code__slug_does_not_exist(client: AsyncClient, slug: 
     response = await client.get(
         url=f"{application_settings.LINKS_PREFIX}/{slug}/qr",
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' does not exist"
@@ -53,13 +55,16 @@ async def test_get_link_qr_code__slug_not_owned_by_user(
     )
 
     override_get_current_user(user_other)
+
     response = await client.get(
         url=f"{application_settings.LINKS_PREFIX}/{slug}/qr",
     )
-    data = response.json()
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    data = response.json()
     error = data["detail"][0]
+
     assert error["input"] == slug
     assert error["loc"] == ["path", "slug"]
     assert error["msg"] == f"Slug '{slug}' is not owned by the current user"
@@ -80,6 +85,4 @@ async def test_get_link_qr_code__slug_owned_by_current_user(client: AsyncClient,
     assert response.headers["Content-Type"] == "image/png"
     assert response.headers["Cache-Control"] == "private, max-age=86400"
     assert response.headers["Content-Disposition"] == f'inline; filename="{slug}.png"'
-    png_signature = b"\x89PNG\r\n\x1a\n"
-    assert response.content.startswith(png_signature)
     assert response.content == _expected_qr_code(slug)

@@ -11,11 +11,15 @@ from lnkr.api.dependencies.timezone import get_timezone
 
 
 def test_get_timezone__defaults_to_utc() -> None:
-    assert get_timezone().key == "UTC"
+    timezone = get_timezone()
+
+    assert timezone.key == "UTC"
 
 
 def test_get_timezone__valid_iana_timezone() -> None:
-    assert get_timezone("Europe/Copenhagen").key == "Europe/Copenhagen"
+    timezone = get_timezone("Europe/Copenhagen")
+
+    assert timezone.key == "Europe/Copenhagen"
 
 
 def test_get_timezone__invalid_timezone() -> None:

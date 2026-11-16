@@ -6,9 +6,9 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
-from unittest import mock
 
 import pytest
+import time_machine
 from sqlalchemy import select
 
 from lnkr.database.tokens import login_token_database
@@ -18,11 +18,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def test_consume_login_token__is_atomic_and_single_use(session: AsyncSession, email: str) -> None:
+@pytest.mark.usefixtures("frozen_now")
+async def test_consume_login_token__single_use(
+    session: AsyncSession,
+    email: str,
+    now: datetime,
+    expires_at: datetime,
+) -> None:
     login_token = LoginToken(
         token_hash="a" * 64,
         email=email,
-        expires_at=datetime.now(tz=UTC) + timedelta(minutes=1),
+        expires_at=expires_at,
     )
     session.add(login_token)
     await session.commit()
@@ -31,24 +37,52 @@ async def test_consume_login_token__is_atomic_and_single_use(session: AsyncSessi
     consumed_again = await login_token_database.consume_login_token(session, login_token.token_hash)
 
     assert consumed is not None
-    assert consumed.used_at is not None
+    assert consumed.used_at == now
     assert consumed_again is None
 
 
-async def test_consume_login_token__rejects_expired_token(session: AsyncSession, email: str) -> None:
-    login_token = LoginToken(
-        token_hash="b" * 64,
-        email=email,
-        expires_at=datetime.now(tz=UTC) - timedelta(seconds=1),
-    )
-    session.add(login_token)
+async def test_consume_login_token__immediately_before_expiration(
+    session: AsyncSession,
+    email: str,
+    expires_at: datetime,
+) -> None:
+    token = LoginToken(email=email, token_hash="a" * 64, expires_at=expires_at)
+    session.add(token)
     await session.commit()
 
-    assert await login_token_database.consume_login_token(session, login_token.token_hash) is None
+    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
+        consumed_token = await login_token_database.consume_login_token(session, token.token_hash)
+
+    assert consumed_token is token
 
 
-async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(session: AsyncSession, email: str) -> None:
-    now = datetime.now(tz=UTC)
+@pytest.mark.parametrize(
+    "elapsed",
+    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
+)
+async def test_consume_login_token__expired_token(session: AsyncSession, email: str, elapsed: timedelta) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    token = LoginToken(
+        email=email,
+        token_hash="a" * 64,
+        expires_at=expires_at,
+    )
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at + elapsed, tick=False):
+        consumed_token = await login_token_database.consume_login_token(session, token.token_hash)
+
+    assert consumed_token is None
+    await session.refresh(token)
+    assert token.used_at is None
+
+
+async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(
+    session: AsyncSession,
+    email: str,
+    now: datetime,
+) -> None:
     tokens = [
         LoginToken(token_hash="a" * 64, email=email, expires_at=now + timedelta(minutes=10)),
         LoginToken(token_hash="b" * 64, email=email, expires_at=now + timedelta(minutes=1), used_at=now),
@@ -67,7 +101,7 @@ async def test_delete_login_tokens_by_email__deletes_only_matching_tokens(sessio
 @pytest.mark.parametrize(
     ("expires_in", "used_at"),
     [
-        pytest.param(timedelta(seconds=-1), None, id="expired"),
+        pytest.param(timedelta(microseconds=-1), None, id="expired"),
         pytest.param(timedelta(0), None, id="expires-now"),
         pytest.param(timedelta(minutes=1), datetime(2026, 1, 1, tzinfo=UTC), id="used"),
     ],
@@ -77,16 +111,15 @@ async def test_clean_up_login_tokens__deletes_only_expired_or_used_tokens_withou
     email: str,
     expires_in: timedelta,
     used_at: datetime | None,
+    now: datetime,
 ) -> None:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
     obsolete_token = LoginToken(token_hash="a" * 64, email=email, expires_at=now + expires_in, used_at=used_at)
-    valid_token = LoginToken(token_hash="b" * 64, email=email, expires_at=now + timedelta(seconds=1))
+    valid_token = LoginToken(token_hash="b" * 64, email=email, expires_at=now + timedelta(microseconds=1))
     session.add_all([obsolete_token, valid_token])
     await session.commit()
     token_ids = {obsolete_token.id, valid_token.id}
 
-    with mock.patch.object(login_token_database, "datetime") as clock:
-        clock.now.return_value = now
+    with time_machine.travel(now, tick=False):
         await login_token_database.clean_up_login_tokens(session)
 
     assert list((await session.scalars(select(LoginToken.id))).all()) == [valid_token.id]
