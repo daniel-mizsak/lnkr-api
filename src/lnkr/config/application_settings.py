@@ -46,10 +46,12 @@ class ApplicationSettings(BaseSettings):
 
     # API
     API_VERSION: str = "v1"
+
     AUTH_PREFIX: str = "/auth"
-    FORWARD_PREFIX: str = "/forward"
-    LINKS_PREFIX: str = "/links"
     USER_PREFIX: str = "/user"
+
+    LINKS_PREFIX: str = "/links"
+    FORWARD_PREFIX: str = "/forward"
 
     @property
     def API_VERSION_PREFIX(self) -> str:  # noqa: N802

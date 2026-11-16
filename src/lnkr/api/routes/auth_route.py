@@ -43,10 +43,8 @@ if TYPE_CHECKING:
 
     from lnkr.models import IpAddress, UserAgent
 
-email_templates = Jinja2Templates(directory="templates/email")
-
-
 router = APIRouter(prefix=application_settings.AUTH_PREFIX, dependencies=[Depends(verify_frontend_api_key)])
+email_templates = Jinja2Templates(directory="templates/email")
 
 
 @router.post("/request-login-token", status_code=status.HTTP_204_NO_CONTENT)
