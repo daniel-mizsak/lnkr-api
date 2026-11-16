@@ -51,7 +51,7 @@ email_templates = Jinja2Templates(directory="templates/email")
 async def request_login_token_endpoint(
     login_token_create: LoginTokenCreate,
     session: Annotated[AsyncSession, Depends(get_session)],
-    geoip_reader: Annotated[Reader, Depends(get_geoip_reader)],
+    geoip_reader: Annotated[Reader | None, Depends(get_geoip_reader)],
     ip_address: Annotated[IpAddress, Depends(get_ip_address)],
     user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> Response:

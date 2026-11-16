@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from geoip2.database import Reader
 
 
-async def get_geoip_reader(request: Request) -> Reader:
-    """Get geoip reader for IP lookup operations."""
-    reader: Reader = request.app.state.geoip_reader
+async def get_geoip_reader(request: Request) -> Reader | None:
+    """Get geoip reader for IP lookup operations, if the database is available."""
+    reader: Reader | None = request.app.state.geoip_reader
     return reader

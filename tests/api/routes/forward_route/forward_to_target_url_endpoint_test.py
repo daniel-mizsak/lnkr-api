@@ -6,6 +6,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import status
 from sqlalchemy import select
 
@@ -88,6 +89,32 @@ async def test_forward_to_target_url__click_ip_metadata(
     # Only the globally routable address (and its resolved country) is stored.
     assert [item["ip_address"] for item in data["items"]] == [None, None, ip_address_public, None]
     assert [item["country_code"] for item in data["items"]] == [None, None, ip_address_public_country_code, None]
+
+
+@pytest.mark.usefixtures("geoip_database_unavailable")
+async def test_forward_to_target_url__geoip_database_unavailable(
+    client: AsyncClient,
+    slug: str,
+    target_url: str,
+    frontend_api_key: str,
+    ip_address_public: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.LINKS_PREFIX}",
+        json={"slug": slug, "target_url": target_url},
+    )
+
+    await client.get(
+        url=f"{application_settings.FORWARD_PREFIX}/{slug}",
+        headers={FRONTEND_API_KEY_HEADER: frontend_api_key, CLIENT_IP_HEADER: ip_address_public},
+    )
+
+    response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
+    assert response.status_code == status.HTTP_200_OK
+    clicks = response.json()["items"]
+    assert len(clicks) == 1
+    assert clicks[0]["ip_address"] == ip_address_public
+    assert clicks[0]["country_code"] is None
 
 
 async def test_forward_to_target_url__click_user_agent_metadata(
