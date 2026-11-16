@@ -12,8 +12,29 @@
 ## Testing
 
 - When implementing new features, do not add tests until explicitly asked.
-- Name tests `test_<operation>__<scenario_or_behavior>` and follow the wording established in neighboring tests. Describe the scenario or observable behavior, and reuse existing terms for equivalent cases.
-- Parametrize tests when cases share the same setup and assertions without conditional test logic; use separate tests when cases need different setup or patch targets.
+- Name tests `test_<operation>__<scenario_or_behavior>`, using existing terminology.
+  Keep one scenario per test, but multiple actions are appropriate when testing a sequence.
+- Order tests for each function to follow its control flow, including validation and early exits before later operations.
+  Preserve the existing order when the relative flow order is unclear.
+- Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
+  Split cases when sharing assertions requires indirect logic.
+- Set up endpoint tests through APIs.
+  Write directly to the database only for otherwise unreachable states.
+  Database reads may verify side effects.
+- Use the fixed `now` fixture for ordinary time data.
+  Use `@pytest.mark.usefixtures("frozen_now")` when the behavior or assertions depend on the current time.
+  Use local `time_machine.travel(..., tick=False)` contexts for boundaries or time changes.
+  Fixtures needing frozen setup must depend on `frozen_now`.
+- Separate Arrange, Act, Assert with blank lines, without routine section comments.
+  Store results before asserting, except with `pytest.raises`.
+- For HTTP responses, separate these groups with blank lines, in order:
+  response assertions (status, headers, content), body/error extraction, body assertions.
+  Use dictionary equality for long JSON contracts.
+  For short responses, assign `data = response.json()` before assertions or error extraction.
+  A single body assertion for a successful response may immediately follow that assignment if no error is extracted.
+- Keep assertions focused on the named scenario. Add supporting checks only when needed to prove its outcome or state transition.
+- Avoid duplicating lower-level behavior unless needed to verify the current layer's contract.
+  Preserve endpoint status, authorization, and response-contract checks.
 - Run tests with `just test`. Docker must be running (testcontainers); the recipe sources `deployment/.env.common` and `.env.development`, so do not run bare `uv run pytest`.
 - Run lint with `just lint` and type checks with `just type`.
 - `just check-all` must pass before finishing any change. Runs lint, type checks, and tests; requires 100% test-code coverage and reports application coverage.

@@ -17,19 +17,27 @@ from lnkr.models.constraints import USER_AGENT_METADATA_MAX_LENGTH
 
 
 def test_check_frontend_api_key__missing() -> None:
-    assert check_frontend_api_key(None) is False
+    is_valid = check_frontend_api_key(None)
+
+    assert is_valid is False
 
 
 def test_check_frontend_api_key__invalid(frontend_api_key_invalid: str) -> None:
-    assert check_frontend_api_key(frontend_api_key_invalid) is False
+    is_valid = check_frontend_api_key(frontend_api_key_invalid)
+
+    assert is_valid is False
 
 
 def test_check_frontend_api_key__non_ascii() -> None:
-    assert check_frontend_api_key("é") is False
+    is_valid = check_frontend_api_key("é")
+
+    assert is_valid is False
 
 
 def test_check_frontend_api_key__valid(frontend_api_key: str) -> None:
-    assert check_frontend_api_key(frontend_api_key) is True
+    is_valid = check_frontend_api_key(frontend_api_key)
+
+    assert is_valid is True
 
 
 def test_verify_frontend_api_key__missing() -> None:
@@ -37,6 +45,7 @@ def test_verify_frontend_api_key__missing() -> None:
         verify_frontend_api_key(None)
 
     error = exc_info.value
+
     assert error.status_code == status.HTTP_401_UNAUTHORIZED
     assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
 
@@ -46,28 +55,39 @@ def test_verify_frontend_api_key__invalid(frontend_api_key_invalid: str) -> None
         verify_frontend_api_key(frontend_api_key_invalid)
 
     error = exc_info.value
+
     assert error.status_code == status.HTTP_401_UNAUTHORIZED
     assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
 
 
 def test_verify_frontend_api_key__valid(frontend_api_key: str) -> None:
-    assert verify_frontend_api_key(frontend_api_key) is None
+    result = verify_frontend_api_key(frontend_api_key)
+
+    assert result is None
 
 
 def test_get_ip_address__missing() -> None:
-    assert get_ip_address().ip_address is None
+    ip_address = get_ip_address()
+
+    assert ip_address.ip_address is None
 
 
 def test_get_ip_address__malformed(ip_address_malformed: str) -> None:
-    assert get_ip_address(ip_address_malformed).ip_address is None
+    ip_address = get_ip_address(ip_address_malformed)
+
+    assert ip_address.ip_address is None
 
 
 def test_get_ip_address__not_global(ip_address_private: str) -> None:
-    assert get_ip_address(ip_address_private).ip_address is None
+    ip_address = get_ip_address(ip_address_private)
+
+    assert ip_address.ip_address is None
 
 
 def test_get_ip_address__global(ip_address_public: str) -> None:
-    assert get_ip_address(ip_address_public).ip_address == ip_address_public
+    ip_address = get_ip_address(ip_address_public)
+
+    assert ip_address.ip_address == ip_address_public
 
 
 def test_get_user_agent__missing() -> None:
@@ -86,6 +106,7 @@ def test_get_user_agent__unrecognized(user_agent_unrecognized: str) -> None:
 
 def test_get_user_agent__metadata_truncated() -> None:
     browser = "a" * (USER_AGENT_METADATA_MAX_LENGTH + 1)
+
     parsed_user_agent = get_user_agent(f"{browser}-iPad/1 CFNetwork")
 
     assert parsed_user_agent.browser == browser[:USER_AGENT_METADATA_MAX_LENGTH]

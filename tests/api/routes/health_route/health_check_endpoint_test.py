@@ -16,9 +16,10 @@ if TYPE_CHECKING:
 
 async def test_health_check__healthy_dependencies(client: AsyncClient) -> None:
     response = await client.get(url="/health")
-    data = response.json()
 
     assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
     assert data["message"] == "lnkr api running"
     assert data["environment"] == ApplicationEnvironment.DEVELOPMENT
     assert data["database"] is True

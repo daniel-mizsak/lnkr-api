@@ -11,14 +11,14 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
 
 
-def test_application_environment() -> None:
+def test_application_environment__supported_values() -> None:
     assert set(ApplicationEnvironment.__members__.keys()) == {"DEVELOPMENT", "PRODUCTION"}
 
     assert ApplicationEnvironment.DEVELOPMENT.value == "development"
     assert ApplicationEnvironment.PRODUCTION.value == "production"
 
 
-def test_application_settings() -> None:
+def test_application_settings__default_values() -> None:
     # General
     assert application_settings.ENVIRONMENT == ApplicationEnvironment.DEVELOPMENT
     assert application_settings.FRONTEND_APP_URL == "https://app.lnkr.by"
@@ -38,10 +38,12 @@ def test_application_settings() -> None:
     # API
     assert application_settings.API_VERSION == "v1"
     assert application_settings.API_VERSION_PREFIX == "/v1"
+
     assert application_settings.AUTH_PREFIX == "/auth"
-    assert application_settings.FORWARD_PREFIX == "/forward"
-    assert application_settings.LINKS_PREFIX == "/links"
     assert application_settings.USER_PREFIX == "/user"
+
+    assert application_settings.LINKS_PREFIX == "/links"
+    assert application_settings.FORWARD_PREFIX == "/forward"
 
     # SMTP
     assert application_settings.FROM_EMAIL == "hello@lnkr.by"
