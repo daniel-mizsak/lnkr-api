@@ -49,4 +49,12 @@ async def consume_login_token(session: AsyncSession, token_hash: str) -> LoginTo
 
 async def delete_login_tokens_by_email(session: AsyncSession, email: str) -> None:
     """Delete all login tokens for a given email without committing the transaction."""
-    await session.execute(delete(LoginToken).where(LoginToken.email == email))
+    statement = delete(LoginToken).where(LoginToken.email == email)
+    await session.execute(statement)
+
+
+async def clean_up_login_tokens(session: AsyncSession) -> None:
+    """Delete all expired or used login tokens without committing the transaction."""
+    now = datetime.now(tz=UTC)
+    statement = delete(LoginToken).where((LoginToken.expires_at <= now) | (LoginToken.used_at.is_not(None)))
+    await session.execute(statement)
