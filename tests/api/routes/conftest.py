@@ -52,6 +52,17 @@ OverrideGetCurrentUserFixture = Generator[OverrideGetCurrentUserFunction]
 
 
 @pytest.fixture()
+def geoip_database_unavailable(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> Generator[None]:  # noqa: ARG001
+    # Use the real dependency to read None from application state, covering both the dependency and endpoint.
+    monkeypatch.setattr(app.state, "geoip_reader", None, raising=False)
+    original_reader = app.dependency_overrides.pop(get_geoip_reader)
+    try:
+        yield
+    finally:
+        app.dependency_overrides[get_geoip_reader] = original_reader
+
+
+@pytest.fixture()
 def override_authentication(client: AsyncClient) -> Generator[None]:  # noqa: ARG001
     original_user = app.dependency_overrides.pop(get_current_user)
 

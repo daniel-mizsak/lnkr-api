@@ -128,6 +128,36 @@ async def test_request_login_token__complete_request_metadata(
     assert login_token.operating_system == "Mac OS X"
 
 
+@pytest.mark.usefixtures("geoip_database_unavailable")
+async def test_request_login_token__geoip_database_unavailable(
+    client: AsyncClient,
+    session: AsyncSession,
+    mock_send_email: mock.AsyncMock,
+    email: str,
+    ip_address_public: str,
+) -> None:
+    await client.post(
+        url=f"{application_settings.AUTH_PREFIX}/request-login-token",
+        json={"email": email},
+        headers={CLIENT_IP_HEADER: ip_address_public},
+    )
+    mock_send_email.assert_awaited_once()
+
+    await_args = mock_send_email.await_args
+    assert await_args is not None
+    sent_email = await_args.args[0]
+    email_body = sent_email.get_payload()[0].get_payload(decode=True).decode()
+    soup = BeautifulSoup(email_body, "html.parser")
+    assert _get_text_by_class(soup, "request-ip-address") == ip_address_public
+    assert _get_text_by_class(soup, "request-country-code") == "Country Not Found"
+    assert soup.find(class_="request-country-flag") is None
+
+    result = await session.execute(select(LoginToken))
+    login_token = result.scalar_one()
+    assert login_token.ip_address == ip_address_public
+    assert login_token.country_code is None
+
+
 def _get_text_by_class(soup: BeautifulSoup, class_name: str) -> str:
     element = soup.find(class_=class_name)
     assert element is not None

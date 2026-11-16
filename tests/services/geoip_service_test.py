@@ -39,6 +39,10 @@ def test_get_country_code_from_ip__empty_string(geoip_reader: Reader) -> None:
     assert get_country_code_from_ip(geoip_reader, "") is None
 
 
+def test_get_country_code_from_ip__geoip_database_unavailable(ip_address_public: str) -> None:
+    assert get_country_code_from_ip(None, ip_address_public) is None
+
+
 @pytest.mark.parametrize(
     ("country_code", "country_flag"),
     [
