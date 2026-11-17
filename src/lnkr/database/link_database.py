@@ -25,8 +25,8 @@ async def save_link(session: AsyncSession, link: Link) -> Link:
 
 async def get_link_by_slug(session: AsyncSession, slug: str) -> Link | None:
     """Get link from database by slug."""
-    result = await session.execute(select(Link).where(Link.slug == slug).limit(1))
-    return result.scalars().first()
+    result = await session.execute(select(Link).where(Link.slug == slug))
+    return result.scalar_one_or_none()
 
 
 async def delete_link(session: AsyncSession, link: Link) -> None:

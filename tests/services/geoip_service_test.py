@@ -26,6 +26,12 @@ def test_get_country_code_from_ip__empty_string(geoip_reader: Reader) -> None:
     assert country_code is None
 
 
+def test_get_country_code_from_ip__geoip_database_unavailable(ip_address_public: str) -> None:
+    country_code = get_country_code_from_ip(None, ip_address_public)
+
+    assert country_code is None
+
+
 def test_get_country_code_from_ip__public_ip(
     geoip_reader: Reader,
     ip_address_public: str,
@@ -47,10 +53,6 @@ def test_get_country_code_from_ip__malformed_ip(geoip_reader: Reader, ip_address
     country_code = get_country_code_from_ip(geoip_reader, ip_address_malformed)
 
     assert country_code is None
-
-
-def test_get_country_code_from_ip__geoip_database_unavailable(ip_address_public: str) -> None:
-    assert get_country_code_from_ip(None, ip_address_public) is None
 
 
 @pytest.mark.parametrize(

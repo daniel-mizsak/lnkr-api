@@ -158,8 +158,12 @@ async def test_forward_to_target_url__geoip_database_unavailable(
     )
 
     response = await client.get(url=f"{application_settings.LINKS_PREFIX}/{slug}/clicks")
+
     assert response.status_code == status.HTTP_200_OK
-    clicks = response.json()["items"]
+
+    data = response.json()
+    clicks = data["items"]
+
     assert len(clicks) == 1
     assert clicks[0]["ip_address"] == ip_address_public
     assert clicks[0]["country_code"] is None

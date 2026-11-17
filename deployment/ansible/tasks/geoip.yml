@@ -36,7 +36,7 @@
 
 - name: Add geoip database update script
   ansible.builtin.copy:
-    src: ./../../scripts/update-geoip-database.sh
+    src: geoip/update-geoip-database.sh
     dest: /usr/local/bin/update-geoip-database.sh
     owner: root
     group: "{{ application_user_name }}"

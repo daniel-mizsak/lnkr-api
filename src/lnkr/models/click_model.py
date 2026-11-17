@@ -94,23 +94,6 @@ class Click(Base):
     """Click model saved in the database."""
 
     __tablename__ = "clicks"
-    __table_args__ = (
-        # Lists a link's clicks in timestamp/id order with efficient cursor pagination.
-        Index(
-            "ix_clicks_link_id_timestamp_id",
-            "link_id",
-            "timestamp",
-            "id",
-        ),
-        # Filters analytics by link, source, and time; includes country_code for index-only country counts.
-        Index(
-            "ix_clicks_link_id_source_timestamp",
-            "link_id",
-            "source",
-            "timestamp",
-            postgresql_include=("country_code",),
-        ),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     timestamp: Mapped[datetime] = mapped_column(
@@ -118,7 +101,6 @@ class Click(Base):
         default=lambda: datetime.now(tz=UTC),
         nullable=False,
     )
-    # TODO: Make sure source is added to existing records.
     source: Mapped[ClickSource] = mapped_column(Enum(ClickSource, name="click_source"), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(IP_ADDRESS_MAX_LENGTH), nullable=True)
     country_code: Mapped[str | None] = mapped_column(String(COUNTRY_CODE_LENGTH), nullable=True)
@@ -143,6 +125,24 @@ class Click(Base):
             operating_system=click_create.operating_system,
             link_id=link_id,
         )
+
+    __table_args__ = (
+        # Lists a link's clicks in timestamp/id order with efficient cursor pagination.
+        Index(
+            "ix_clicks_link_id_timestamp_id",
+            "link_id",
+            "timestamp",
+            "id",
+        ),
+        # Filters analytics by link, source, and time; includes country_code for index-only country counts.
+        Index(
+            "ix_clicks_link_id_source_timestamp",
+            "link_id",
+            "source",
+            "timestamp",
+            postgresql_include=("country_code",),
+        ),
+    )
 
 
 # Analytics
