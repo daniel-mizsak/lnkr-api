@@ -81,16 +81,30 @@ just deploy-production
 
 ### Future improvements
 
-- Add sorting links by click count.
-- Add callback URL to request login token endpoint and attach to login_url.
-- Remove old login tokens with a scheduled cleanup task.
-- Improve rate limiting.
-- Add more in-depth logging.
+#### Before the v1 release
+
+- Add essential operational logging for authentication, email delivery, and dependency failures, without exposing tokens or credentials. Review which personal data is sent to Sentry.
 - Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
+- Improve rate limiting for login token requests and verification, refresh token rotation, and password-protected link unlocking. Add per-email send limits and verify that client identification works through the production proxy and frontend.
+- Rehearse restoring an encrypted backup and document deployment, recovery, and rollback steps. Use the same pinned release image for the application and database migrations instead of `latest`.
+
+#### Features
+
+- Add sorting links by click count.
+- Add a callback URL to the request login token endpoint and include it in the login URL, restricting destinations to approved frontend locations.
+- Send email to confirm account deletion, with a link that calls the account deletion endpoint and redirects to a success page.
+- Allow users to reset click data for their links.
+- Make "reused links" show confirmation page before redirecting.
+
+#### Codebase and infrastructure improvements
+
+- Move login email sending and retries to a durable background worker so requests do not wait for SMTP. Save the token and email job together using a transactional outbox, return `202 Accepted` after committing, and preserve idempotency and token expiry handling across retries.
+- Unify and improve header policies (such as `Cache-Control`).
+- Update versioning to use header instead of /v1 versioning.
 - Add dedicated concurrency tests with separate database sessions and controlled synchronization to verify race-condition handling for login token consumption, user creation, refresh token rotation, and user link limits.
-- Automatic deployment to production when GitHub release is created.
-- Use `secrets_dir="/run/secrets"` for docker secrets in production.
-- No 3rd party service for sending emails. Self-hosted SMTP server.
+- Add test to validate database migrations.
+- Automate staging deployment when a GitHub push occurs to the main branch and production deployment when a release is created.
+- Use `secrets_dir="/run/secrets"` for Docker secrets in production.
 
 <hr>
 
