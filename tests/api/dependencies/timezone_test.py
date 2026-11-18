@@ -5,9 +5,9 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import pytest
-from fastapi import HTTPException, status
 
 from lnkr.api.dependencies.timezone import get_timezone
+from lnkr.exceptions import TimezoneInvalidError
 
 
 def test_get_timezone__defaults_to_utc() -> None:
@@ -25,15 +25,7 @@ def test_get_timezone__valid_iana_timezone() -> None:
 def test_get_timezone__invalid_timezone() -> None:
     timezone = "Not/A-Timezone"
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(TimezoneInvalidError) as exc_info:
         get_timezone(timezone)
 
-    assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert exc_info.value.detail == [
-        {
-            "input": timezone,
-            "loc": ["query", "timezone"],
-            "msg": f"Timezone '{timezone}' is invalid",
-            "type": "timezone_invalid",
-        }
-    ]
+    assert exc_info.value.timezone == timezone

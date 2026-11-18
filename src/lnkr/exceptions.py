@@ -4,14 +4,10 @@ Project specific exceptions.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
-from typing import TYPE_CHECKING, NoReturn
-
-from fastapi import HTTPException, status
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import uuid
-
-NO_STORE_HEADERS = {"Cache-Control": "no-store"}
 
 
 class LnkrError(Exception):
@@ -26,18 +22,6 @@ class FrontendApiKeyInvalidError(LnkrError):
         msg = "The provided frontend api key is invalid"
         super().__init__(msg)
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "frontend_api_key_invalid",
-                },
-            ],
-        )
-
 
 class CursorInvalidError(LnkrError):
     """Raised when a pagination cursor is invalid."""
@@ -48,20 +32,6 @@ class CursorInvalidError(LnkrError):
         super().__init__(msg)
         self.cursor = cursor
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=[
-                {
-                    "input": self.cursor,
-                    "loc": ["query", "cursor"],
-                    "msg": str(self),
-                    "type": "cursor_invalid",
-                },
-            ],
-        )
-
 
 class LoginTokenInvalidError(LnkrError):
     """Raised when a login token is invalid, used or expired."""
@@ -71,20 +41,8 @@ class LoginTokenInvalidError(LnkrError):
         msg = "The provided login token is invalid, used or has expired"
         super().__init__(msg)
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "login_token_invalid",
-                },
-            ],
-        )
 
-
-class LoginTokenGenerationError(LnkrError):
+class LoginTokenGenerationFailedError(LnkrError):
     """Raised when a unique login token cannot be generated."""
 
     def __init__(self) -> None:
@@ -92,39 +50,14 @@ class LoginTokenGenerationError(LnkrError):
         msg = "Unable to generate a login token. Please try again."
         super().__init__(msg)
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "login_token_generation_failed",
-                },
-            ],
-        )
 
-
-class LoginTokenDeliveryError(LnkrError):
+class LoginTokenDeliveryFailedError(LnkrError):
     """Raised when the login token email cannot be sent."""
 
     def __init__(self) -> None:
         """Initialize with default error message."""
         msg = "Unable to send a login token. Please request a new token in 60 seconds."
         super().__init__(msg)
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception with retry guidance."""
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "login_token_delivery_failed",
-                },
-            ],
-            headers=NO_STORE_HEADERS | {"Retry-After": "60"},
-        )
 
 
 class RefreshTokenInvalidError(LnkrError):
@@ -135,38 +68,14 @@ class RefreshTokenInvalidError(LnkrError):
         msg = "The provided refresh token is invalid, used, revoked or has expired"
         super().__init__(msg)
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "refresh_token_invalid",
-                },
-            ],
-        )
 
-
-class RefreshTokenGenerationError(LnkrError):
+class RefreshTokenGenerationFailedError(LnkrError):
     """Raised when a unique refresh token cannot be generated."""
 
     def __init__(self) -> None:
         """Initialize with default error message."""
         msg = "Unable to generate a refresh token. Please try again."
         super().__init__(msg)
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "refresh_token_generation_failed",
-                },
-            ],
-        )
 
 
 class UserDoesNotExistError(LnkrError):
@@ -186,18 +95,6 @@ class UserDoesNotExistError(LnkrError):
         """Initialize with default error message for user email."""
         return cls(f"User with email '{email}' does not exist")
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "user_does_not_exist",
-                },
-            ],
-        )
-
 
 class UserLinkLimitExceededError(LnkrError):
     """Raised when a user exceeds their link limit."""
@@ -206,18 +103,6 @@ class UserLinkLimitExceededError(LnkrError):
         """Initialize with default error message."""
         msg = f"User '{email}' exceeds their link limit of {user_link_limit}"
         super().__init__(msg)
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "user_link_limit_exceeded",
-                },
-            ],
-        )
 
 
 class TimezoneInvalidError(LnkrError):
@@ -229,20 +114,6 @@ class TimezoneInvalidError(LnkrError):
         super().__init__(msg)
         self.timezone = timezone
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=[
-                {
-                    "input": self.timezone,
-                    "loc": ["query", "timezone"],
-                    "msg": str(self),
-                    "type": "timezone_invalid",
-                },
-            ],
-        )
-
 
 class SlugAlreadyExistsError(LnkrError):
     """Raised when a slug already exists in the database."""
@@ -252,20 +123,6 @@ class SlugAlreadyExistsError(LnkrError):
         msg = f"Slug '{slug}' already exists"
         super().__init__(msg)
         self.slug = slug
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=[
-                {
-                    "input": self.slug,
-                    "loc": ["body", "slug"],
-                    "msg": str(self),
-                    "type": "slug_already_exists",
-                },
-            ],
-        )
 
 
 class SlugDoesNotExistError(LnkrError):
@@ -277,20 +134,6 @@ class SlugDoesNotExistError(LnkrError):
         super().__init__(msg)
         self.slug = slug
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=[
-                {
-                    "input": self.slug,
-                    "loc": ["path", "slug"],
-                    "msg": str(self),
-                    "type": "slug_does_not_exist",
-                },
-            ],
-        )
-
 
 class SlugNotOwnedByUserError(LnkrError):
     """Raised when a slug is not owned by the current user."""
@@ -301,41 +144,14 @@ class SlugNotOwnedByUserError(LnkrError):
         super().__init__(msg)
         self.slug = slug
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=[
-                {
-                    "input": self.slug,
-                    "loc": ["path", "slug"],
-                    "msg": str(self),
-                    "type": "slug_not_owned_by_user",
-                },
-            ],
-        )
 
-
-class RandomSlugGenerationError(LnkrError):
+class RandomSlugGenerationFailedError(LnkrError):
     """Raised when an unused random slug cannot be generated."""
 
     def __init__(self) -> None:
         """Initialize with default error message."""
         msg = "Unable to generate an unused random slug. Please try again."
         super().__init__(msg)
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "random_slug_generation_failed",
-                },
-            ],
-            headers=NO_STORE_HEADERS,
-        )
 
 
 class LinkExpiredError(LnkrError):
@@ -347,19 +163,6 @@ class LinkExpiredError(LnkrError):
         super().__init__(msg)
         self.slug = slug
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "link_expired",
-                },
-            ],
-            headers=NO_STORE_HEADERS,
-        )
-
 
 class LinkPasswordRequiredError(LnkrError):
     """Raised when a link requires a password to be forwarded."""
@@ -369,19 +172,6 @@ class LinkPasswordRequiredError(LnkrError):
         msg = f"Link with slug '{slug}' requires a password"
         super().__init__(msg)
         self.slug = slug
-
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "link_password_required",
-                },
-            ],
-            headers=NO_STORE_HEADERS,
-        )
 
 
 class LinkPasswordInvalidError(LnkrError):
@@ -393,19 +183,6 @@ class LinkPasswordInvalidError(LnkrError):
         super().__init__(msg)
         self.slug = slug
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "link_password_invalid",
-                },
-            ],
-            headers=NO_STORE_HEADERS,
-        )
-
 
 class LinkDisabledError(LnkrError):
     """Raised when a link is disabled by the user."""
@@ -416,14 +193,34 @@ class LinkDisabledError(LnkrError):
         super().__init__(msg)
         self.slug = slug
 
-    def raise_http_exception(self) -> NoReturn:
-        """Raise an http exception."""
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail=[
-                {
-                    "msg": str(self),
-                    "type": "link_disabled",
-                },
-            ],
-        )
+
+class AccessCredentialsMissingError(LnkrError):
+    """Raised when access credentials are missing."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        super().__init__("Not authenticated")
+
+
+class AccessTokenMissingError(LnkrError):
+    """Raised when an access token is missing."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        super().__init__("Authorization token is missing")
+
+
+class AccessTokenInvalidError(LnkrError):
+    """Raised when an access token is invalid."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        super().__init__("Invalid token")
+
+
+class AccessTokenSubjectInvalidError(LnkrError):
+    """Raised when an access token subject is invalid."""
+
+    def __init__(self) -> None:
+        """Initialize with default error message."""
+        super().__init__("Invalid token")

@@ -14,7 +14,7 @@ import time_machine
 from sqlalchemy import select
 
 from lnkr.database import user_database
-from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError, RefreshTokenGenerationError
+from lnkr.exceptions import LoginTokenGenerationFailedError, LoginTokenInvalidError, RefreshTokenGenerationFailedError
 from lnkr.models import IpAddress, LoginToken, LoginTokenCreate, RefreshToken, UserAgent
 from lnkr.services.tokens import login_token_service, refresh_token_service
 
@@ -42,7 +42,7 @@ async def test_create_and_save_login_token__generation_attempts_exhausted(
 
     with (
         mock.patch.object(login_token_service.secrets, "choice", mock.Mock(return_value=generated_character)),
-        pytest.raises(LoginTokenGenerationError),
+        pytest.raises(LoginTokenGenerationFailedError),
     ):
         await login_token_service.create_and_save_login_token(
             session,
@@ -137,7 +137,7 @@ async def test_authenticate_with_login_token__refresh_failure_rolls_back_all_cha
             "token_urlsafe",
             mock.Mock(return_value=conflicting_refresh_token_value),
         ),
-        pytest.raises(RefreshTokenGenerationError),
+        pytest.raises(RefreshTokenGenerationFailedError),
     ):
         await login_token_service.authenticate_with_login_token(session, login_token_value)
 

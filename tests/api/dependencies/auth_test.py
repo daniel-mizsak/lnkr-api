@@ -10,12 +10,17 @@ from unittest import mock
 
 import jwt
 import pytest
-from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from lnkr.api.dependencies import auth
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
-from lnkr.exceptions import UserDoesNotExistError
+from lnkr.exceptions import (
+    AccessCredentialsMissingError,
+    AccessTokenInvalidError,
+    AccessTokenMissingError,
+    AccessTokenSubjectInvalidError,
+    UserDoesNotExistError,
+)
 from lnkr.models import AccessTokenPayload, User
 
 if TYPE_CHECKING:
@@ -39,21 +44,18 @@ async def test_get_current_user__development_without_credentials_uses_configured
 async def test_get_current_user__production_without_credentials_is_forbidden() -> None:
     with (
         mock.patch.object(application_settings, "ENVIRONMENT", ApplicationEnvironment.PRODUCTION),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(AccessCredentialsMissingError),
     ):
         await auth.get_current_user(None, mock.AsyncMock())
-
-    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
 
 
 async def test_get_current_user__empty_token_is_unauthorized() -> None:
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="")
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(AccessTokenMissingError) as exc_info:
         await auth.get_current_user(credentials, mock.AsyncMock())
 
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    assert exc_info.value.detail == "Authorization token is missing"
+    assert str(exc_info.value) == "Authorization token is missing"
 
 
 async def test_get_current_user__invalid_token_is_unauthorized() -> None:
@@ -61,12 +63,11 @@ async def test_get_current_user__invalid_token_is_unauthorized() -> None:
 
     with (
         mock.patch.object(auth, "decode_access_token", mock.Mock(side_effect=jwt.InvalidTokenError())),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(AccessTokenInvalidError) as exc_info,
     ):
         await auth.get_current_user(credentials, mock.AsyncMock())
 
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    assert exc_info.value.detail == "Invalid token"
+    assert str(exc_info.value) == "Invalid token"
 
 
 async def test_get_current_user__invalid_subject_is_unauthorized(now: datetime) -> None:
@@ -75,14 +76,12 @@ async def test_get_current_user__invalid_subject_is_unauthorized(now: datetime) 
 
     with (
         mock.patch.object(auth, "decode_access_token", mock.Mock(return_value=payload)),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(AccessTokenSubjectInvalidError),
     ):
         await auth.get_current_user(credentials, mock.AsyncMock())
 
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
-
-async def test_get_current_user__missing_token_user_maps_domain_error(user_id: uuid.UUID, now: datetime) -> None:
+async def test_get_current_user__missing_token_user_raises_domain_error(user_id: uuid.UUID, now: datetime) -> None:
     payload = AccessTokenPayload(sub=str(user_id), iat=now, exp=now + timedelta(minutes=1), type="access")
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
 
@@ -93,12 +92,11 @@ async def test_get_current_user__missing_token_user_maps_domain_error(user_id: u
             "get_user_by_id",
             mock.AsyncMock(side_effect=UserDoesNotExistError.by_id(user_id)),
         ),
-        pytest.raises(HTTPException) as exc_info,
+        pytest.raises(UserDoesNotExistError) as exc_info,
     ):
         await auth.get_current_user(credentials, mock.AsyncMock())
 
-    assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-    assert exc_info.value.detail[0]["type"] == "user_does_not_exist"  # ty: ignore[invalid-argument-type]
+    assert str(exc_info.value) == f"User with id '{user_id}' does not exist"
 
 
 async def test_get_current_user__loads_token_user(user: User, now: datetime) -> None:

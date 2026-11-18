@@ -30,9 +30,9 @@ async def send_email(message: MIMEMultipart) -> None:
     for attempt in range(maximum_email_sending_attempts):
         try:
             await to_thread.run_sync(_send_email_sync, message)
-        except OSError as error:
-            # SMTPException also inherits from OSError.
-            if attempt == maximum_email_sending_attempts - 1 or not _is_retryable_smtp_error(error):
+        # SMTPException also inherits from OSError.
+        except OSError as os_error:
+            if attempt == maximum_email_sending_attempts - 1 or not _is_retryable_smtp_error(os_error):
                 raise
             jitter = random.uniform(0, 0.5)  # noqa: S311 - Retry jitter does not require cryptographic randomness.
             await sleep(2**attempt + jitter)
@@ -73,13 +73,17 @@ def _send_email_sync(message: MIMEMultipart) -> None:
 
     if application_settings.ENVIRONMENT == ApplicationEnvironment.DEVELOPMENT:
         with smtplib.SMTP(
-            host=application_settings.SMTP_HOST, port=application_settings.SMTP_PORT, timeout=timeout
+            host=application_settings.SMTP_HOST,
+            port=application_settings.SMTP_PORT,
+            timeout=timeout,
         ) as smtp_server:
             smtp_server.login(application_settings.SMTP_USER, application_settings.SMTP_PASSWORD.get_secret_value())
             smtp_server.send_message(message)
     else:
         with smtplib.SMTP_SSL(
-            host=application_settings.SMTP_HOST, port=application_settings.SMTP_PORT, timeout=timeout
+            host=application_settings.SMTP_HOST,
+            port=application_settings.SMTP_PORT,
+            timeout=timeout,
         ) as smtp_server:
             smtp_server.login(application_settings.SMTP_USER, application_settings.SMTP_PASSWORD.get_secret_value())
             smtp_server.send_message(message)

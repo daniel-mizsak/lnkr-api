@@ -10,14 +10,6 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from lnkr.api.dependencies import get_cache, get_current_user, get_session
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import (
-    RandomSlugGenerationError,
-    SlugAlreadyExistsError,
-    SlugDoesNotExistError,
-    SlugNotOwnedByUserError,
-    UserDoesNotExistError,
-    UserLinkLimitExceededError,
-)
 from lnkr.models import LinkCreate, LinkListRead, LinkRead, LinkUpdate, PageNumberPaginatedRead, SlugRead, User
 from lnkr.models.link_model import TARGET_URL_MAX_LENGTH
 from lnkr.services.click_service import list_click_counts
@@ -45,14 +37,7 @@ async def create_link_endpoint(
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Create a link with a slug that points to the target url."""
-    try:
-        link = await create_link(session, link_create, user)
-    except SlugAlreadyExistsError as slug_already_exists_error:
-        slug_already_exists_error.raise_http_exception()
-    except UserDoesNotExistError as user_does_not_exist_error:
-        user_does_not_exist_error.raise_http_exception()
-    except UserLinkLimitExceededError as user_link_limit_exceeded_error:
-        user_link_limit_exceeded_error.raise_http_exception()
+    link = await create_link(session, link_create, user)
     return LinkRead.from_link(link)
 
 
@@ -63,10 +48,7 @@ async def get_random_slug_endpoint(
 ) -> SlugRead:
     """Get an unused random slug."""
     response.headers["Cache-Control"] = "no-store"
-    try:
-        slug = await generate_unused_random_slug(session)
-    except RandomSlugGenerationError as random_slug_generation_error:
-        random_slug_generation_error.raise_http_exception()
+    slug = await generate_unused_random_slug(session)
     return SlugRead(slug=slug)
 
 
@@ -77,12 +59,7 @@ async def get_link_endpoint(
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Get a link by its slug."""
-    try:
-        link = await get_link_validate_user(session, slug, user)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
-        slug_not_owned_by_user_error.raise_http_exception()
+    link = await get_link_validate_user(session, slug, user)
     return LinkRead.from_link(link)
 
 
@@ -102,12 +79,7 @@ async def get_link_qr_code_endpoint(
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     """Get a QR code for the frontend URL of a link."""
-    try:
-        qr_code = await generate_link_qr_code(session, slug, user)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
-        slug_not_owned_by_user_error.raise_http_exception()
+    qr_code = await generate_link_qr_code(session, slug, user)
     return Response(
         content=qr_code,
         media_type="image/png",
@@ -128,12 +100,7 @@ async def update_link_endpoint(
     user: Annotated[User, Depends(get_current_user)],
 ) -> LinkRead:
     """Update link."""
-    try:
-        link = await update_link(session, cache, slug, link_update, user)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
-        slug_not_owned_by_user_error.raise_http_exception()
+    link = await update_link(session, cache, slug, link_update, user)
     return LinkRead.from_link(link)
 
 
@@ -145,12 +112,7 @@ async def delete_link_endpoint(
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     """Delete link."""
-    try:
-        await delete_link(session, cache, slug, user)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except SlugNotOwnedByUserError as slug_not_owned_by_user_error:
-        slug_not_owned_by_user_error.raise_http_exception()
+    await delete_link(session, cache, slug, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

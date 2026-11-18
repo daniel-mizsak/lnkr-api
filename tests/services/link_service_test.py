@@ -18,7 +18,7 @@ from lnkr.exceptions import (
     LinkDisabledError,
     LinkExpiredError,
     LinkPasswordInvalidError,
-    RandomSlugGenerationError,
+    RandomSlugGenerationFailedError,
     SlugAlreadyExistsError,
     SlugDoesNotExistError,
     SlugNotOwnedByUserError,
@@ -37,24 +37,7 @@ def link_create_fixture(slug: str, target_url: str) -> LinkCreate:
     return LinkCreate.model_validate({"slug": slug, "target_url": target_url})
 
 
-async def test_create_link__defaults_applied(
-    session: AsyncSession,
-    user: User,
-    link_create: LinkCreate,
-) -> None:
-    link = await link_service.create_link(session, link_create, user)
-
-    assert link.status == LinkStatus.ACTIVE
-    assert link.favorite is False
-    assert link.expires_at is None
-    assert link.password_hash is None
-
-
-async def test_create_link__user_does_not_exist(
-    session: AsyncSession,
-    link_create: LinkCreate,
-    email: str,
-) -> None:
+async def test_create_link__user_does_not_exist(session: AsyncSession, link_create: LinkCreate, email: str) -> None:
     user_missing = User(id=uuid.uuid4(), email=f"missing_{email}")
 
     with pytest.raises(UserDoesNotExistError):
@@ -92,6 +75,15 @@ async def test_create_link__slug_already_exists(
         await link_service.create_link(session, link_create, user)
 
 
+async def test_create_link__defaults_applied(session: AsyncSession, user: User, link_create: LinkCreate) -> None:
+    link = await link_service.create_link(session, link_create, user)
+
+    assert link.status == LinkStatus.ACTIVE
+    assert link.favorite is False
+    assert link.expires_at is None
+    assert link.password_hash is None
+
+
 async def test_generate_unused_random_slug__retries_with_increasing_length(
     session: AsyncSession,
     link: Link,
@@ -115,7 +107,7 @@ async def test_generate_unused_random_slug__generation_attempts_exhausted(sessio
 
     with (
         mock.patch.object(link_service, "_generate_random_slug", mock.Mock(return_value=link.slug)),
-        pytest.raises(RandomSlugGenerationError),
+        pytest.raises(RandomSlugGenerationFailedError),
     ):
         await link_service.generate_unused_random_slug(session)
 
@@ -161,6 +153,25 @@ async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
 
     assert retrieved_link == LinkCache.from_link(link)
     add_cached_link.assert_awaited_once_with(cache, retrieved_link)
+
+
+async def test_get_cached_link__cache_write_failure_ignored(
+    session: AsyncSession,
+    link: Link,
+) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache_error = RedisError("cache write failure")
+    cache = mock.AsyncMock()
+
+    with (
+        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=None)),
+        mock.patch.object(link_service.link_cache, "add_cached_link", mock.AsyncMock(side_effect=cache_error)),
+    ):
+        retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
+
+    assert retrieved_link == LinkCache.from_link(link)
 
 
 async def test_get_cached_link__disabled_link(cached_link: LinkCache) -> None:
@@ -226,17 +237,17 @@ async def test_get_cached_link_validate_password__invalid_password(cached_link: 
         )
 
 
-async def test_get_link_validate_user__slug_owned_by_current_user(
+async def test_get_link_validate_user__slug_does_not_exist(
     session: AsyncSession,
-    link: Link,
     user: User,
+    slug: str,
+    link_other: Link,
 ) -> None:
-    session.add(link)
+    session.add(link_other)
     await session.commit()
 
-    owned_link = await link_service.get_link_validate_user(session, link.slug, user)
-
-    assert owned_link is link
+    with pytest.raises(SlugDoesNotExistError):
+        await link_service.get_link_validate_user(session, slug, user)
 
 
 async def test_get_link_validate_user__slug_not_owned_by_user(
@@ -251,17 +262,17 @@ async def test_get_link_validate_user__slug_not_owned_by_user(
         await link_service.get_link_validate_user(session, link.slug, user_other)
 
 
-async def test_get_link_validate_user__slug_does_not_exist(
+async def test_get_link_validate_user__slug_owned_by_current_user(
     session: AsyncSession,
+    link: Link,
     user: User,
-    slug: str,
-    link_other: Link,
 ) -> None:
-    session.add(link_other)
+    session.add(link)
     await session.commit()
 
-    with pytest.raises(SlugDoesNotExistError):
-        await link_service.get_link_validate_user(session, slug, user)
+    owned_link = await link_service.get_link_validate_user(session, link.slug, user)
+
+    assert owned_link is link
 
 
 @pytest.mark.parametrize(
@@ -308,7 +319,9 @@ async def test_delete_link__cache_invalidation_attempted(
     with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
         await link_service.delete_link(session, cache, link.slug, user)
 
-    assert await link_service.link_database.get_link_by_slug(session, link.slug) is None
+    deleted_link = await link_service.link_database.get_link_by_slug(session, link.slug)
+
+    assert deleted_link is None
     set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
 
 
