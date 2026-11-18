@@ -1,5 +1,10 @@
 # AGENTS.md
 
+## Writing style
+
+- Do not use semicolons. Write separate sentences.
+  Within a list, place related guidance on an indented continuation line under the same bullet.
+
 ## Runtime and dependencies
 
 - Requires Python 3.14.
@@ -29,6 +34,12 @@
   Preserve the existing order when the relative flow order is unclear.
 - Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
   Split cases when sharing assertions requires indirect logic.
+- Keep fixtures used by only one test module in that module, after imports and before the tests.
+  Put fixtures shared by multiple modules in the nearest common `conftest.py`.
+  Use `tests/conftest.py` for suite-wide fixtures.
+- For data, client, and factory fixtures, use `@pytest.fixture(name="<name>")` with a function named `<name>_fixture`.
+  For setup and dependency-override fixtures, use a descriptive action or state name with `@pytest.fixture()`,
+  matching existing names.
 - Set up endpoint tests through APIs.
   Write directly to the database only for otherwise unreachable states.
   Database reads may verify side effects.

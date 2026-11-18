@@ -22,5 +22,5 @@ def get_click_cursor(
 
     try:
         return ClickCursor.decode(cursor)
-    except ValueError:
-        CursorInvalidError(cursor).raise_http_exception()
+    except ValueError as value_error:
+        raise CursorInvalidError(cursor) from value_error

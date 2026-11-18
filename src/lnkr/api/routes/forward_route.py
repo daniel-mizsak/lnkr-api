@@ -19,13 +19,7 @@ from lnkr.api.dependencies import (
 )
 from lnkr.api.dependencies.header import FRONTEND_API_KEY_HEADER, check_frontend_api_key
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import (
-    LinkDisabledError,
-    LinkExpiredError,
-    LinkPasswordInvalidError,
-    LinkPasswordRequiredError,
-    SlugDoesNotExistError,
-)
+from lnkr.exceptions import LinkPasswordRequiredError
 from lnkr.models import ClickCreate, ClickSource, IpAddress, LinkForward, LinkUnlock, UserAgent
 from lnkr.services.click_service import create_click
 from lnkr.services.link_service import get_cached_link, get_cached_link_validate_password
@@ -61,17 +55,9 @@ async def forward_to_target_url_endpoint(
     user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug."""
-    try:
-        cached_link = await get_cached_link(session, cache, slug)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except LinkDisabledError as link_disabled_error:
-        link_disabled_error.raise_http_exception()
-    except LinkExpiredError as link_expired_error:
-        link_expired_error.raise_http_exception()
-
+    cached_link = await get_cached_link(session, cache, slug)
     if cached_link.password_hash is not None:
-        LinkPasswordRequiredError(slug=cached_link.slug).raise_http_exception()
+        raise LinkPasswordRequiredError(slug=cached_link.slug)
 
     with suppress(SQLAlchemyError):
         await create_click(
@@ -85,7 +71,6 @@ async def forward_to_target_url_endpoint(
             ),
             cached_link.id,
         )
-
     return LinkForward(target_url=cached_link.target_url)
 
 
@@ -101,16 +86,7 @@ async def unlock_target_url_endpoint(
     user_agent: Annotated[UserAgent, Depends(get_user_agent)],
 ) -> LinkForward:
     """Return the target url of the link with the given slug if the provided password is correct."""
-    try:
-        cached_link = await get_cached_link_validate_password(session, cache, slug, link_unlock.password)
-    except SlugDoesNotExistError as slug_does_not_exist_error:
-        slug_does_not_exist_error.raise_http_exception()
-    except LinkDisabledError as link_disabled_error:
-        link_disabled_error.raise_http_exception()
-    except LinkExpiredError as link_expired_error:
-        link_expired_error.raise_http_exception()
-    except LinkPasswordInvalidError as link_password_invalid_error:
-        link_password_invalid_error.raise_http_exception()
+    cached_link = await get_cached_link_validate_password(session, cache, slug, link_unlock.password)
 
     with suppress(SQLAlchemyError):
         await create_click(
@@ -124,5 +100,4 @@ async def unlock_target_url_endpoint(
             ),
             cached_link.id,
         )
-
     return LinkForward(target_url=cached_link.target_url)

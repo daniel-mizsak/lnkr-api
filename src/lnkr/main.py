@@ -15,7 +15,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from maxminddb import InvalidDatabaseError
+from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
+from lnkr.api.dependencies.header import CLIENT_IP_HEADER, FRONTEND_API_KEY_HEADER
+from lnkr.api.exception_handlers import register_exception_handlers
 from lnkr.api.main import api_router
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
 from lnkr.database import engine
@@ -32,10 +35,12 @@ if (application_settings.SENTRY_DSN is not None) and (
     sentry_sdk.init(
         dsn=application_settings.SENTRY_DSN.get_secret_value(),
         environment=application_settings.ENVIRONMENT,
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        profile_session_sample_rate=1.0,
-        profile_lifecycle="trace",
+        send_default_pii=False,
+        include_local_variables=False,
+        include_source_context=False,
+        max_request_body_size="never",
+        max_breadcrumbs=0,
+        event_scrubber=EventScrubber(denylist=[*DEFAULT_DENYLIST, FRONTEND_API_KEY_HEADER, CLIENT_IP_HEADER]),
     )
 
 
@@ -76,6 +81,9 @@ app = FastAPI(
         "displayRequestDuration": True,
     },
 )
+
+
+register_exception_handlers(app)
 
 
 @app.get("/", include_in_schema=False)

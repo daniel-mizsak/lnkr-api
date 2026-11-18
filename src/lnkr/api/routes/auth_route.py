@@ -14,14 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from lnkr.api.dependencies import get_geoip_reader, get_ip_address, get_session, get_user_agent, verify_frontend_api_key
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import (
-    LoginTokenDeliveryError,
-    LoginTokenGenerationError,
-    LoginTokenInvalidError,
-    RefreshTokenGenerationError,
-    RefreshTokenInvalidError,
-    UserDoesNotExistError,
-)
+from lnkr.exceptions import LoginTokenDeliveryFailedError
 from lnkr.models import (
     AuthTokensRead,
     LoginTokenCreate,
@@ -59,16 +52,13 @@ async def request_login_token_endpoint(
 ) -> Response:
     """Request a login token that is sent to the user's email."""
     country_code = get_country_code_from_ip(geoip_reader, ip_address.ip_address)
-    try:
-        login_token_value = await create_and_save_login_token(
-            session,
-            login_token_create,
-            ip_address,
-            country_code,
-            user_agent,
-        )
-    except LoginTokenGenerationError as login_token_generation_error:
-        login_token_generation_error.raise_http_exception()
+    login_token_value = await create_and_save_login_token(
+        session,
+        login_token_create,
+        ip_address,
+        country_code,
+        user_agent,
+    )
 
     message = _create_login_token_email(
         login_token_create.email,
@@ -80,8 +70,8 @@ async def request_login_token_endpoint(
     # TODO: Add stricter rate limiting.
     try:
         await send_email(message)
-    except OSError:
-        LoginTokenDeliveryError().raise_http_exception()
+    except OSError as os_error:
+        raise LoginTokenDeliveryFailedError from os_error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -91,14 +81,9 @@ async def verify_login_token_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AuthTokensRead:
     """Verify login token and return authentication tokens."""
-    try:
-        user, refresh_token = await authenticate_with_login_token(session, login_token_verify.login_token_value)
-    except LoginTokenInvalidError as login_token_invalid_error:
-        login_token_invalid_error.raise_http_exception()
-    except RefreshTokenGenerationError as refresh_token_generation_error:
-        refresh_token_generation_error.raise_http_exception()
-
+    user, refresh_token = await authenticate_with_login_token(session, login_token_verify.login_token_value)
     access_token = create_access_token(user_id=user.id)
+
     return AuthTokensRead(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -108,17 +93,10 @@ async def refresh_auth_tokens_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AuthTokensRead:
     """Verify refresh token and return new authentication tokens."""
-    try:
-        user_id, new_refresh_token = await rotate_refresh_token(session, refresh_token_rotate.refresh_token_value)
-        user = await get_user_by_id(session, user_id)
-    except RefreshTokenInvalidError as refresh_token_invalid_error:
-        refresh_token_invalid_error.raise_http_exception()
-    except RefreshTokenGenerationError as refresh_token_generation_error:
-        refresh_token_generation_error.raise_http_exception()
-    except UserDoesNotExistError as user_does_not_exist_error:
-        user_does_not_exist_error.raise_http_exception()
-
+    user_id, new_refresh_token = await rotate_refresh_token(session, refresh_token_rotate.refresh_token_value)
+    user = await get_user_by_id(session, user_id)
     access_token = create_access_token(user.id)
+
     return AuthTokensRead(access_token=access_token, refresh_token=new_refresh_token)
 
 
@@ -128,10 +106,7 @@ async def revoke_refresh_token_endpoint(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     """Revoke a refresh token and invalidate the current session."""
-    try:
-        await revoke_refresh_token(session, refresh_token_revoke.refresh_token_value)
-    except RefreshTokenInvalidError as refresh_token_invalid_error:
-        refresh_token_invalid_error.raise_http_exception()
+    await revoke_refresh_token(session, refresh_token_revoke.refresh_token_value)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

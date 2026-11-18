@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from lnkr.config.application_settings import application_settings
 from lnkr.database import user_database
 from lnkr.database.tokens import login_token_database
-from lnkr.exceptions import LoginTokenGenerationError, LoginTokenInvalidError
+from lnkr.exceptions import LoginTokenGenerationFailedError, LoginTokenInvalidError
 from lnkr.models import LoginToken, UserCreate
 from lnkr.services.tokens.refresh_token_service import create_refresh_token_without_commit
 from lnkr.services.user_service import get_or_create_user_without_commit
@@ -111,7 +111,7 @@ async def _create_login_token_without_commit(
         else:
             return login_token_value
 
-    raise LoginTokenGenerationError
+    raise LoginTokenGenerationFailedError
 
 
 def _hash_token(token_value: str) -> str:

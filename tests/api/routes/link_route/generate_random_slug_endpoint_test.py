@@ -12,7 +12,7 @@ from fastapi import status
 
 from lnkr.api.routes import link_route
 from lnkr.config.application_settings import application_settings
-from lnkr.exceptions import RandomSlugGenerationError
+from lnkr.exceptions import RandomSlugGenerationFailedError
 
 if TYPE_CHECKING:
     from httpx2 import AsyncClient
@@ -22,7 +22,7 @@ async def test_generate_random_slug__generation_failure(client: AsyncClient) -> 
     with mock.patch.object(
         link_route,
         "generate_unused_random_slug",
-        mock.AsyncMock(side_effect=RandomSlugGenerationError()),
+        mock.AsyncMock(side_effect=RandomSlugGenerationFailedError()),
     ):
         response = await client.get(url=f"{application_settings.LINKS_PREFIX}/slugs/random")
 

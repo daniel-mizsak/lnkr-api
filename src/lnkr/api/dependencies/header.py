@@ -33,7 +33,7 @@ def verify_frontend_api_key(
 ) -> None:
     """Verify that the provided frontend API key is valid."""
     if not _api_key_matches(x_frontend_api_key):
-        FrontendApiKeyInvalidError().raise_http_exception()
+        raise FrontendApiKeyInvalidError
 
 
 def _api_key_matches(provided_api_key: str | None) -> bool:

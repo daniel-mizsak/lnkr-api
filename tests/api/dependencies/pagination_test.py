@@ -8,9 +8,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pytest
-from fastapi import HTTPException, status
 
 from lnkr.api.dependencies.pagination import get_click_cursor
+from lnkr.exceptions import CursorInvalidError
 from lnkr.models import ClickCursor
 
 if TYPE_CHECKING:
@@ -24,11 +24,10 @@ def test_get_click_cursor__missing() -> None:
 
 
 def test_get_click_cursor__invalid_cursor() -> None:
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(CursorInvalidError) as exc_info:
         get_click_cursor("invalid")
 
-    assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert exc_info.value.detail[0]["type"] == "cursor_invalid"  # ty: ignore[invalid-argument-type]
+    assert exc_info.value.cursor == "invalid"
 
 
 def test_get_click_cursor__valid_cursor(now: datetime) -> None:

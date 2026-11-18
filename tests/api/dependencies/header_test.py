@@ -5,7 +5,6 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import pytest
-from fastapi import HTTPException, status
 
 from lnkr.api.dependencies.header import (
     check_frontend_api_key,
@@ -13,6 +12,7 @@ from lnkr.api.dependencies.header import (
     get_user_agent,
     verify_frontend_api_key,
 )
+from lnkr.exceptions import FrontendApiKeyInvalidError
 from lnkr.models.constraints import USER_AGENT_METADATA_MAX_LENGTH
 
 
@@ -41,23 +41,13 @@ def test_check_frontend_api_key__valid(frontend_api_key: str) -> None:
 
 
 def test_verify_frontend_api_key__missing() -> None:
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FrontendApiKeyInvalidError):
         verify_frontend_api_key(None)
-
-    error = exc_info.value
-
-    assert error.status_code == status.HTTP_401_UNAUTHORIZED
-    assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
 
 
 def test_verify_frontend_api_key__invalid(frontend_api_key_invalid: str) -> None:
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FrontendApiKeyInvalidError):
         verify_frontend_api_key(frontend_api_key_invalid)
-
-    error = exc_info.value
-
-    assert error.status_code == status.HTTP_401_UNAUTHORIZED
-    assert error.detail[0]["type"] == "frontend_api_key_invalid"  # ty: ignore[invalid-argument-type]
 
 
 def test_verify_frontend_api_key__valid(frontend_api_key: str) -> None:

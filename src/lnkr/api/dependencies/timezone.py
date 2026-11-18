@@ -16,5 +16,5 @@ def get_timezone(timezone: Annotated[str, Query(min_length=1, max_length=64)] = 
     """Get a validated IANA timezone from the query parameters."""
     try:
         return ZoneInfo(timezone)
-    except ValueError, ZoneInfoNotFoundError:
-        TimezoneInvalidError(timezone).raise_http_exception()
+    except (ValueError, ZoneInfoNotFoundError) as error:
+        raise TimezoneInvalidError(timezone) from error

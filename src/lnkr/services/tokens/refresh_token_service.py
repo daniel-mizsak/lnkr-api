@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from lnkr.config.application_settings import application_settings
 from lnkr.database import user_database
 from lnkr.database.tokens import refresh_token_database
-from lnkr.exceptions import RefreshTokenGenerationError, RefreshTokenInvalidError
+from lnkr.exceptions import RefreshTokenGenerationFailedError, RefreshTokenInvalidError
 from lnkr.models import RefreshToken
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ async def create_refresh_token_without_commit(session: AsyncSession, user_id: uu
         else:
             return refresh_token_value
 
-    raise RefreshTokenGenerationError
+    raise RefreshTokenGenerationFailedError
 
 
 async def rotate_refresh_token(session: AsyncSession, refresh_token_value: str) -> tuple[uuid.UUID, str]:

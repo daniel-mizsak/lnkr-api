@@ -83,8 +83,7 @@ just deploy-production
 
 #### Before the v1 release
 
-- Add essential operational logging for authentication, email delivery, and dependency failures, without exposing tokens or credentials. Review which personal data is sent to Sentry.
-- Raise `LnkrError` subclasses directly from the service layer and convert them to HTTP responses via a single FastAPI exception handler, instead of catching and re-raising in every route.
+- Add essential operational logging for authentication, email delivery, and dependency failures, without exposing tokens or credentials.
 - Improve rate limiting for login token requests and verification, refresh token rotation, and password-protected link unlocking. Add per-email send limits and verify that client identification works through the production proxy and frontend.
 - Rehearse restoring an encrypted backup and document deployment, recovery, and rollback steps. Use the same pinned release image for the application and database migrations instead of `latest`.
 

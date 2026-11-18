@@ -185,11 +185,15 @@ async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: U
     await session.commit()
 
     cache = mock.AsyncMock()
-    set_cached_links_invalidated = mock.AsyncMock(side_effect=RedisError("cache failure"))
+    cache_error = RedisError("cache failure")
+    set_cached_links_invalidated = mock.AsyncMock(side_effect=cache_error)
 
     with mock.patch.object(user_service.link_cache, "set_cached_links_invalidated", set_cached_links_invalidated):
         await user_service.delete_user(session, cache, user)
 
+    deleted_user = await session.get(User, user_id)
+    deleted_link = await user_service.link_database.get_link_by_slug(session, slug)
+
     set_cached_links_invalidated.assert_awaited_once_with(cache, [slug])
-    assert await session.get(User, user_id) is None
-    assert await user_service.link_database.get_link_by_slug(session, slug) is None
+    assert deleted_user is None
+    assert deleted_link is None

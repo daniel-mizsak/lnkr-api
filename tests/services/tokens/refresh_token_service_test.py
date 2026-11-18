@@ -12,7 +12,7 @@ from unittest import mock
 import pytest
 from sqlalchemy import select
 
-from lnkr.exceptions import RefreshTokenGenerationError, RefreshTokenInvalidError
+from lnkr.exceptions import RefreshTokenGenerationFailedError, RefreshTokenInvalidError
 from lnkr.models import RefreshToken
 from lnkr.services.tokens import refresh_token_service
 
@@ -74,7 +74,7 @@ async def test_rotate_refresh_token__replacement_failure_preserves_original_toke
             "token_urlsafe",
             mock.Mock(return_value=replacement_token_value),
         ),
-        pytest.raises(RefreshTokenGenerationError),
+        pytest.raises(RefreshTokenGenerationFailedError),
     ):
         await refresh_token_service.rotate_refresh_token(session, refresh_token_value)
 
