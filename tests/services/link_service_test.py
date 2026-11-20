@@ -4,6 +4,7 @@ Tests for the link service.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -129,20 +130,48 @@ async def test_get_cached_link__cache_hit_avoids_database(cached_link: LinkCache
     get_link.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "cache_error",
-    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
-)
+async def test_get_cached_link__cache_lookup_failure_loads_database_and_populates_cache(
+    session: AsyncSession,
+    link: Link,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache_error = RedisError("cache failure")
+    cache = mock.AsyncMock()
+    get_cached_link_by_slug = mock.AsyncMock(return_value=None, side_effect=cache_error)
+    add_cached_link = mock.AsyncMock()
+
+    with (
+        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", get_cached_link_by_slug),
+        mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
+    ):
+        retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
+
+    assert retrieved_link == LinkCache.from_link(link)
+    add_cached_link.assert_awaited_once_with(cache, retrieved_link)
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.link_service"
+        and record.getMessage() == f"Cache lookup failed for slug {link.slug!r}, falling back to the database"
+    ]
+    assert records
+    assert records[0].levelno == logging.WARNING
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is cache_error
+
+
 async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
     session: AsyncSession,
     link: Link,
-    cache_error: RedisError | None,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    get_cached_link_by_slug = mock.AsyncMock(return_value=None, side_effect=cache_error)
+    get_cached_link_by_slug = mock.AsyncMock(return_value=None)
     add_cached_link = mock.AsyncMock()
 
     with (
@@ -158,6 +187,7 @@ async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
 async def test_get_cached_link__cache_write_failure_ignored(
     session: AsyncSession,
     link: Link,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     session.add(link)
     await session.commit()
@@ -172,6 +202,16 @@ async def test_get_cached_link__cache_write_failure_ignored(
         retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
 
     assert retrieved_link == LinkCache.from_link(link)
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.link_service"
+        and record.getMessage() == f"Cache write failed for slug {link.slug!r}"
+    ]
+    assert records
+    assert records[0].levelno == logging.WARNING
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is cache_error
 
 
 async def test_get_cached_link__disabled_link(cached_link: LinkCache) -> None:
@@ -275,22 +315,17 @@ async def test_get_link_validate_user__slug_owned_by_current_user(
     assert owned_link is link
 
 
-@pytest.mark.parametrize(
-    "cache_error",
-    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
-)
 async def test_update_link__cache_invalidation_attempted(
     session: AsyncSession,
     link: Link,
     user: User,
     target_url: str,
-    cache_error: RedisError | None,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    set_cached_link_invalidated = mock.AsyncMock(side_effect=cache_error)
+    set_cached_link_invalidated = mock.AsyncMock()
     link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
 
     with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
@@ -300,19 +335,68 @@ async def test_update_link__cache_invalidation_attempted(
     set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
 
 
-@pytest.mark.parametrize(
-    "cache_error",
-    [pytest.param(None, id="available"), pytest.param(RedisError(), id="unavailable")],
-)
-async def test_delete_link__cache_invalidation_attempted(
+async def test_update_link__cache_invalidation_failure_ignored(
     session: AsyncSession,
     link: Link,
     user: User,
-    cache_error: RedisError | None,
+    target_url: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     session.add(link)
     await session.commit()
 
+    cache_error = RedisError("cache failure")
+    cache = mock.AsyncMock()
+    set_cached_link_invalidated = mock.AsyncMock(side_effect=cache_error)
+    link_update = LinkUpdate.model_validate({"target_url": f"{target_url}/updated"})
+
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
+        updated_link = await link_service.update_link(session, cache, link.slug, link_update, user)
+
+    assert updated_link.target_url == f"{target_url}/updated"
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.link_service"
+        and record.getMessage() == f"Cache invalidation failed for slug {link.slug!r} updated by user {user.id}"
+    ]
+    assert records
+    assert records[0].levelno == logging.WARNING
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is cache_error
+
+
+async def test_delete_link__cache_invalidation_attempted(
+    session: AsyncSession,
+    link: Link,
+    user: User,
+) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    set_cached_link_invalidated = mock.AsyncMock()
+
+    with mock.patch.object(link_service.link_cache, "set_cached_link_invalidated", set_cached_link_invalidated):
+        await link_service.delete_link(session, cache, link.slug, user)
+
+    deleted_link = await link_service.link_database.get_link_by_slug(session, link.slug)
+
+    assert deleted_link is None
+    set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+
+
+async def test_delete_link__cache_invalidation_failure_ignored(
+    session: AsyncSession,
+    link: Link,
+    user: User,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache_error = RedisError("cache failure")
     cache = mock.AsyncMock()
     set_cached_link_invalidated = mock.AsyncMock(side_effect=cache_error)
 
@@ -323,6 +407,16 @@ async def test_delete_link__cache_invalidation_attempted(
 
     assert deleted_link is None
     set_cached_link_invalidated.assert_awaited_once_with(cache, link.slug)
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.link_service"
+        and record.getMessage() == f"Cache invalidation failed for slug {link.slug!r} deleted by user {user.id}"
+    ]
+    assert records
+    assert records[0].levelno == logging.WARNING
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is cache_error
 
 
 async def test_list_links__normalizes_search_and_caps_page_size(user: User) -> None:

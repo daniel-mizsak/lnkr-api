@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from lnkr.config.database_settings import database_settings
 
+# TODO: Database tracebacks may include emails, target URLs, or token hashes in SQL parameters and error details.
 engine = create_async_engine(
     URL.create(
         drivername="postgresql+psycopg",

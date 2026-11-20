@@ -4,6 +4,7 @@ Tests for the refresh auth tokens endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -37,7 +38,9 @@ async def test_refresh_auth_tokens__missing_frontend_api_key(client: AsyncClient
     assert error["type"] == "frontend_api_key_invalid"
 
 
-async def test_refresh_auth_tokens__invalid_refresh_token(client: AsyncClient) -> None:
+async def test_refresh_auth_tokens__invalid_refresh_token(
+    client: AsyncClient,
+) -> None:
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/refresh-auth-tokens",
         json={"refresh_token_value": ""},
@@ -52,7 +55,10 @@ async def test_refresh_auth_tokens__invalid_refresh_token(client: AsyncClient) -
     assert error["type"] == "refresh_token_invalid"
 
 
-async def test_refresh_auth_tokens__refresh_token_generation_failure(client: AsyncClient) -> None:
+async def test_refresh_auth_tokens__refresh_token_generation_failure(
+    client: AsyncClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     generation_error = RefreshTokenGenerationFailedError()
 
     with mock.patch.object(
@@ -72,6 +78,11 @@ async def test_refresh_auth_tokens__refresh_token_generation_failure(client: Asy
 
     assert error["msg"] == "Unable to generate a refresh token. Please try again."
     assert error["type"] == "refresh_token_generation_failed"
+    assert (
+        "lnkr.api.exception_handlers",
+        logging.ERROR,
+        "Refresh token generation attempts exhausted",
+    ) in caplog.record_tuples
 
 
 async def test_refresh_auth_tokens__user_does_not_exist(client: AsyncClient) -> None:
@@ -100,7 +111,9 @@ async def test_refresh_auth_tokens__valid_refresh_token(
     client: AsyncClient,
     issued_auth_tokens: dict[str, str],
     user: User,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="lnkr.api.routes.auth_route")
     original_refresh_token = issued_auth_tokens["refresh_token"]
 
     response = await client.post(
@@ -119,3 +132,8 @@ async def test_refresh_auth_tokens__valid_refresh_token(
     assert data["refresh_token"]
     assert data["refresh_token"] != original_refresh_token
     assert data["token_type"] == "bearer"  # noqa: S105
+    assert (
+        "lnkr.api.routes.auth_route",
+        logging.INFO,
+        f"Authentication tokens refreshed for user {user.id}",
+    ) in caplog.record_tuples

@@ -4,6 +4,7 @@ Low level cache operations for link management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
@@ -13,6 +14,8 @@ from lnkr.models import LinkCache
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
+
+logger = logging.getLogger(__name__)
 
 _LINK_INVALIDATED = "invalidated"
 _LINK_INVALIDATION_TTL_SECONDS = 5
@@ -37,6 +40,7 @@ async def get_cached_link_by_slug(cache: Redis, slug: str) -> LinkCache | None:
     try:
         return LinkCache.model_validate_json(cast("str", cached_link))
     except ValidationError:
+        logger.warning("Invalid cached link for slug %r, discarding entry", slug)
         await cache.delete(f"link:{slug}")
         return None
 

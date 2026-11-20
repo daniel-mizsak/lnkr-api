@@ -83,7 +83,6 @@ just deploy-production
 
 #### Before the v1 release
 
-- Add essential operational logging for authentication, email delivery, and dependency failures, without exposing tokens or credentials.
 - Improve rate limiting for login token requests and verification, refresh token rotation, and password-protected link unlocking. Add per-email send limits and verify that client identification works through the production proxy and frontend.
 - Rehearse restoring an encrypted backup and document deployment, recovery, and rollback steps. Use the same pinned release image for the application and database migrations instead of `latest`.
 
@@ -97,6 +96,8 @@ just deploy-production
 
 #### Codebase and infrastructure improvements
 
+- Review access logs and exception tracebacks for sensitive information before broader production use.
+- Include the same unique request id in all API and service logs for each request, so related log entries are easy to find when multiple requests run at the same time.
 - Move login email sending and retries to a durable background worker so requests do not wait for SMTP. Save the token and email job together using a transactional outbox, return `202 Accepted` after committing, and preserve idempotency and token expiry handling across retries.
 - Unify and improve header policies (such as `Cache-Control`).
 - Update versioning to use header instead of /v1 versioning.

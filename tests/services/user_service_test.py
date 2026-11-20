@@ -4,6 +4,7 @@ Tests for the user service.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -178,7 +179,12 @@ async def test_delete_user__commit_failure_rolls_back_without_invalidating_cache
     assert await session.get(LoginToken, login_token_id) is not None
 
 
-async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: User, link: Link) -> None:
+async def test_delete_user__cache_failure_ignored(
+    session: AsyncSession,
+    user: User,
+    link: Link,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     user_id = user.id
     slug = link.slug
     session.add(link)
@@ -197,3 +203,13 @@ async def test_delete_user__cache_failure_ignored(session: AsyncSession, user: U
     set_cached_links_invalidated.assert_awaited_once_with(cache, [slug])
     assert deleted_user is None
     assert deleted_link is None
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.user_service"
+        and record.getMessage() == f"Cache invalidation failed for links belonging to deleted user {user_id}"
+    ]
+    assert records
+    assert records[0].levelno == logging.WARNING
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is cache_error

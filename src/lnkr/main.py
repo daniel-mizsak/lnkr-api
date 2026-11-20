@@ -23,6 +23,7 @@ from lnkr.api.main import api_router
 from lnkr.config.application_settings import ApplicationEnvironment, application_settings
 from lnkr.database import engine
 from lnkr.database.initial_data import create_initial_data
+from lnkr.logging_config import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -47,7 +48,9 @@ if (application_settings.SENTRY_DSN is not None) and (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Execute before application startup."""
+    configure_logging()
     await create_initial_data()
+
     # TODO: Avoid interpolating Redis credentials into the URL.
     app.state.cache = redis.from_url(
         "redis://"
@@ -61,7 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.geoip_reader = geoip2.database.Reader(application_settings.GEOIP_COUNTRY_DATABASE_PATH)
     except OSError, InvalidDatabaseError:
         app.state.geoip_reader = None
-        logger.warning("GeoIP database is unavailable; geolocation will be unknown.")
+        logger.warning("GeoIP database is unavailable", exc_info=True)
 
     yield
 

@@ -17,8 +17,6 @@
 
 - Use `extra="forbid"` on input schemas containing fields that may be omitted, so misspelled keys cannot silently fall back to defaults.
   Omit it for required-only input schemas. Misspelling a required key already causes a missing-field error when the correct key is absent.
-- Add logs for failures or when useful for diagnosis or auditing.
-  Include relevant actor/target identifiers.
 
 ## Migrations
 
@@ -57,6 +55,22 @@
 - Keep assertions focused on the named scenario. Add supporting checks only when needed to prove its outcome or state transition.
 - Avoid duplicating lower-level behavior unless needed to verify the current layer's contract.
   Preserve endpoint status, authorization, and response-contract checks.
+
+## Logging
+
+- Log operational failures, retries, fallbacks, and authentication/session events useful for diagnosis or auditing.
+  Log failures where they are handled, without repeating them at every layer.
+- Use `INFO` for audit events, `WARNING` for recoverable problems, and `ERROR` for operational failures.
+  Expected validation or authentication rejections do not automatically warrant `ERROR` or a traceback.
+- Use `logging.getLogger(__name__)` and pass variable values as logging arguments rather than interpolating them eagerly.
+- Include relevant user ids, slugs, retry attempts, and exception details when useful for diagnosis.
+  Check messages and tracebacks for secrets, sensitive URLs, and unnecessary personal data.
+- Test logging alongside functionality only when it protects a diagnostic, auditing, or security requirement.
+- Use `(logger_name, level, message) in caplog.record_tuples` for expected events, allowing unrelated logs.
+  Select relevant records by logger and event before inspecting `exc_info`.
+- Assert exact counts or sequences only when meaningful, such as retries or duplicate prevention.
+  Scope these checks to the relevant logger and events.
+- Assert absence only for an explicit requirement, not merely because the implementation currently logs nothing.
 
 ## Validation
 

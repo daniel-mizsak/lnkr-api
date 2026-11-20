@@ -4,6 +4,7 @@ High level services for email management.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import random
 import smtplib
 import socket
@@ -15,6 +16,8 @@ from lnkr.config.application_settings import ApplicationEnvironment, application
 
 if TYPE_CHECKING:
     from email.mime.multipart import MIMEMultipart
+
+logger = logging.getLogger(__name__)
 
 
 SMTP_TEMPORARY_ERROR_MIN = 400
@@ -32,8 +35,11 @@ async def send_email(message: MIMEMultipart) -> None:
             await to_thread.run_sync(_send_email_sync, message)
         # SMTPException also inherits from OSError.
         except OSError as os_error:
+            # TODO: SMTP tracebacks may include recipient addresses or provider response details.
             if attempt == maximum_email_sending_attempts - 1 or not _is_retryable_smtp_error(os_error):
+                logger.exception("Email delivery failed after %s attempt(s)", attempt + 1)
                 raise
+            logger.warning("Email delivery attempt %s failed, retrying...", attempt + 1, exc_info=True)
             jitter = random.uniform(0, 0.5)  # noqa: S311 - Retry jitter does not require cryptographic randomness.
             await sleep(2**attempt + jitter)
         else:
