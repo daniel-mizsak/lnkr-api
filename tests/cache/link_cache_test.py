@@ -4,6 +4,7 @@ Tests for the link cache.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,13 +23,22 @@ if TYPE_CHECKING:
     from lnkr.models import LinkCache
 
 
-async def test_get_cached_link_by_slug__malformed_cached_link(cache: Redis, slug: str) -> None:
+async def test_get_cached_link_by_slug__malformed_cached_link(
+    cache: Redis,
+    slug: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     await cache.set(f"link:{slug}", '{"slug": "slug"}')
 
     cached_link = await get_cached_link_by_slug(cache, slug)
 
     assert cached_link is None
     assert await cache.get(f"link:{slug}") is None
+    assert (
+        "lnkr.cache.link_cache",
+        logging.WARNING,
+        f"Invalid cached link for slug {slug!r}, discarding entry",
+    ) in caplog.record_tuples
 
 
 @pytest.mark.usefixtures("frozen_now")

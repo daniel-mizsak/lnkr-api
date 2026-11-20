@@ -5,6 +5,7 @@ Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
 import copy
+import logging
 import smtplib
 import socket
 import ssl
@@ -62,10 +63,40 @@ async def test_send_email__offloads_blocking_smtp_call() -> None:
         ),
         pytest.param(ssl.SSLCertVerificationError("Invalid certificate"), id="invalid-certificate"),
         pytest.param(socket.gaierror(socket.EAI_NONAME, "Unknown hostname"), id="unknown-hostname"),
-        pytest.param(ValueError("Unexpected error"), id="unexpected-error"),
     ],
 )
-async def test_send_email__does_not_retry_non_retryable_failure(send_error: Exception) -> None:
+async def test_send_email__does_not_retry_non_retryable_failure(
+    send_error: OSError,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    message = MIMEMultipart()
+    run_sync = mock.AsyncMock(side_effect=send_error)
+    sleep = mock.AsyncMock()
+
+    with (
+        mock.patch.object(email_service.to_thread, "run_sync", run_sync),
+        mock.patch.object(email_service, "sleep", sleep),
+        pytest.raises(type(send_error)) as exc_info,
+    ):
+        await email_service.send_email(message)
+
+    assert exc_info.value is send_error
+    run_sync.assert_awaited_once()
+    sleep.assert_not_awaited()
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.email_service" and record.levelno >= logging.WARNING
+    ]
+    assert [(record.levelno, record.getMessage()) for record in records] == [
+        (logging.ERROR, "Email delivery failed after 1 attempt(s)"),
+    ]
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is send_error
+
+
+async def test_send_email__unexpected_failure() -> None:
+    send_error = ValueError("Unexpected error")
     message = MIMEMultipart()
     run_sync = mock.AsyncMock(side_effect=send_error)
     sleep = mock.AsyncMock()
@@ -82,7 +113,7 @@ async def test_send_email__does_not_retry_non_retryable_failure(send_error: Exce
     sleep.assert_not_awaited()
 
 
-async def test_send_email__exhausted_sending_attempts() -> None:
+async def test_send_email__exhausted_sending_attempts(caplog: pytest.LogCaptureFixture) -> None:
     message = MIMEMultipart()
     send_error = TimeoutError("Timed out")
     run_sync = mock.AsyncMock(side_effect=send_error)
@@ -99,6 +130,19 @@ async def test_send_email__exhausted_sending_attempts() -> None:
     assert exc_info.value is send_error
     assert run_sync.await_count == 3
     assert sleep.await_args_list == [mock.call(1.25), mock.call(2.5)]  # 1 + 0.25, 2 + 0.5
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.email_service" and record.levelno >= logging.WARNING
+    ]
+    assert [(record.levelno, record.getMessage()) for record in records] == [
+        (logging.WARNING, "Email delivery attempt 1 failed, retrying..."),
+        (logging.WARNING, "Email delivery attempt 2 failed, retrying..."),
+        (logging.ERROR, "Email delivery failed after 3 attempt(s)"),
+    ]
+    for record in records:
+        assert record.exc_info
+        assert record.exc_info[1] is send_error
 
 
 @pytest.mark.parametrize(
@@ -115,7 +159,7 @@ async def test_send_email__exhausted_sending_attempts() -> None:
         pytest.param(socket.gaierror(socket.EAI_AGAIN, "Temporary DNS failure"), id="temporary-dns-failure"),
     ],
 )
-async def test_send_email__retries_transient_failure(send_error: OSError) -> None:
+async def test_send_email__retries_transient_failure(send_error: OSError, caplog: pytest.LogCaptureFixture) -> None:
     message = MIMEMultipart()
     run_sync = mock.AsyncMock(side_effect=[send_error, None])
     sleep = mock.AsyncMock()
@@ -128,6 +172,16 @@ async def test_send_email__retries_transient_failure(send_error: OSError) -> Non
 
     assert run_sync.await_count == 2
     sleep.assert_awaited_once()
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "lnkr.services.email_service" and record.levelno >= logging.WARNING
+    ]
+    assert [(record.levelno, record.getMessage()) for record in records] == [
+        (logging.WARNING, "Email delivery attempt 1 failed, retrying..."),
+    ]
+    assert records[0].exc_info
+    assert records[0].exc_info[1] is send_error
 
 
 @pytest.mark.parametrize(

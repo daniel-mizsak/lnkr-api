@@ -4,6 +4,7 @@ API endpoints for authentication.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
 
     from lnkr.models import IpAddress, UserAgent
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix=application_settings.AUTH_PREFIX, dependencies=[Depends(verify_frontend_api_key)])
 email_templates = Jinja2Templates(directory="templates/email")
 
@@ -72,6 +74,7 @@ async def request_login_token_endpoint(
         await send_email(message)
     except OSError as os_error:
         raise LoginTokenDeliveryFailedError from os_error
+    logger.info("Login email sent")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -84,6 +87,7 @@ async def verify_login_token_endpoint(
     user, refresh_token = await authenticate_with_login_token(session, login_token_verify.login_token_value)
     access_token = create_access_token(user_id=user.id)
 
+    logger.info("Login succeeded for user %s", user.id)
     return AuthTokensRead(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -97,6 +101,7 @@ async def refresh_auth_tokens_endpoint(
     user = await get_user_by_id(session, user_id)
     access_token = create_access_token(user.id)
 
+    logger.info("Authentication tokens refreshed for user %s", user.id)
     return AuthTokensRead(access_token=access_token, refresh_token=new_refresh_token)
 
 
@@ -108,6 +113,8 @@ async def revoke_refresh_token_endpoint(
     """Revoke a refresh token and invalidate the current session."""
     await revoke_refresh_token(session, refresh_token_revoke.refresh_token_value)
 
+    # Revocation is idempotent. An unknown token also returns success without identifying a user.
+    logger.info("Refresh token revocation requested")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

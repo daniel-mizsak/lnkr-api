@@ -4,6 +4,7 @@ Tests for the generate random slug endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import re
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -15,10 +16,11 @@ from lnkr.config.application_settings import application_settings
 from lnkr.exceptions import RandomSlugGenerationFailedError
 
 if TYPE_CHECKING:
+    import pytest
     from httpx2 import AsyncClient
 
 
-async def test_generate_random_slug__generation_failure(client: AsyncClient) -> None:
+async def test_generate_random_slug__generation_failure(client: AsyncClient, caplog: pytest.LogCaptureFixture) -> None:
     with mock.patch.object(
         link_route,
         "generate_unused_random_slug",
@@ -34,6 +36,11 @@ async def test_generate_random_slug__generation_failure(client: AsyncClient) -> 
 
     assert error["msg"] == "Unable to generate an unused random slug. Please try again."
     assert error["type"] == "random_slug_generation_failed"
+    assert (
+        "lnkr.api.exception_handlers",
+        logging.ERROR,
+        "Random slug generation attempts exhausted",
+    ) in caplog.record_tuples
 
 
 async def test_generate_random_slug__slug_format_and_cache_policy(client: AsyncClient) -> None:

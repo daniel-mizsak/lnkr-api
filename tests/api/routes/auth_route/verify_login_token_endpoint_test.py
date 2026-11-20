@@ -4,6 +4,7 @@ Tests for the verify login token endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -51,7 +52,10 @@ async def test_verify_login_token__invalid_login_token(client: AsyncClient) -> N
     assert error["type"] == "login_token_invalid"
 
 
-async def test_verify_login_token__refresh_token_generation_failure(client: AsyncClient) -> None:
+async def test_verify_login_token__refresh_token_generation_failure(
+    client: AsyncClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     generation_error = RefreshTokenGenerationFailedError()
 
     with mock.patch.object(
@@ -71,13 +75,21 @@ async def test_verify_login_token__refresh_token_generation_failure(client: Asyn
 
     assert error["msg"] == "Unable to generate a refresh token. Please try again."
     assert error["type"] == "refresh_token_generation_failed"
+    assert (
+        "lnkr.api.exception_handlers",
+        logging.ERROR,
+        "Refresh token generation attempts exhausted",
+    ) in caplog.record_tuples
 
 
 async def test_verify_login_token__valid_login_token(
     client: AsyncClient,
     requested_login_token: str,
     user: User,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="lnkr.api.routes.auth_route")
+
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/verify-login-token",
         json={"login_token_value": requested_login_token},
@@ -93,3 +105,4 @@ async def test_verify_login_token__valid_login_token(
     assert access_token_payload.type == "access"
     assert data["refresh_token"]
     assert data["token_type"] == "bearer"  # noqa: S105
+    assert ("lnkr.api.routes.auth_route", logging.INFO, f"Login succeeded for user {user.id}") in caplog.record_tuples

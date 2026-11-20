@@ -54,4 +54,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 USER nonroot
 EXPOSE 8000
+
+# TODO: Access logs include URLs and query strings, which may contain tokens or other sensitive values.
 CMD ["uvicorn", "asgi:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8000"]

@@ -4,6 +4,7 @@ Tests for the request login token endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 import smtplib
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -43,6 +44,7 @@ async def test_request_login_token__login_token_generation_failure(
     client: AsyncClient,
     mock_send_email: mock.AsyncMock,
     email: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     generation_error = LoginTokenGenerationFailedError()
     create_and_save_login_token = mock.AsyncMock(side_effect=generation_error)
@@ -62,6 +64,11 @@ async def test_request_login_token__login_token_generation_failure(
     assert error["type"] == "login_token_generation_failed"
     create_and_save_login_token.assert_awaited_once()
     mock_send_email.assert_not_awaited()
+    assert (
+        "lnkr.api.exception_handlers",
+        logging.ERROR,
+        "Login token generation attempts exhausted",
+    ) in caplog.record_tuples
 
 
 @pytest.mark.usefixtures("frozen_now")
@@ -102,7 +109,9 @@ async def test_request_login_token__successful_request_after_email_delivery_fail
     client: AsyncClient,
     mock_send_email: mock.AsyncMock,
     email: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="lnkr.api.routes.auth_route")
     mock_send_email.side_effect = [TimeoutError("Timed out"), None]
 
     failed_response = await client.post(
@@ -128,6 +137,7 @@ async def test_request_login_token__successful_request_after_email_delivery_fail
     assert failed_idempotency_key
     assert retry_idempotency_key
     assert retry_idempotency_key != failed_idempotency_key
+    assert ("lnkr.api.routes.auth_route", logging.INFO, "Login email sent") in caplog.record_tuples
 
 
 async def test_request_login_token__missing_request_metadata(
@@ -166,7 +176,10 @@ async def test_request_login_token__complete_request_metadata(
     ip_address_public: str,
     ip_address_public_country_code: str,
     user_agent: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="lnkr.api.routes.auth_route")
+
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/request-login-token",
         json={"email": email},
@@ -202,6 +215,7 @@ async def test_request_login_token__complete_request_metadata(
     assert login_token.country_code == ip_address_public_country_code
     assert login_token.browser == "Chrome"
     assert login_token.operating_system == "Mac OS X"
+    assert ("lnkr.api.routes.auth_route", logging.INFO, "Login email sent") in caplog.record_tuples
 
 
 @pytest.mark.usefixtures("geoip_database_unavailable")

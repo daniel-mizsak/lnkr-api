@@ -4,6 +4,7 @@ Tests for the revoke refresh token endpoint.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,7 +29,9 @@ async def test_revoke_refresh_token__missing_frontend_api_key(client: AsyncClien
     assert error["type"] == "frontend_api_key_invalid"
 
 
-async def test_revoke_refresh_token__invalid_refresh_token(client: AsyncClient) -> None:
+async def test_revoke_refresh_token__invalid_refresh_token(
+    client: AsyncClient,
+) -> None:
     response = await client.post(
         url=f"{application_settings.AUTH_PREFIX}/revoke-refresh-token",
         json={"refresh_token_value": ""},
@@ -46,7 +49,9 @@ async def test_revoke_refresh_token__invalid_refresh_token(client: AsyncClient) 
 async def test_revoke_refresh_token__valid_refresh_token(
     client: AsyncClient,
     issued_auth_tokens: dict[str, str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="lnkr.api.routes.auth_route")
     refresh_token_value = issued_auth_tokens["refresh_token"]
 
     response = await client.post(
@@ -55,3 +60,4 @@ async def test_revoke_refresh_token__valid_refresh_token(
     )
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert ("lnkr.api.routes.auth_route", logging.INFO, "Refresh token revocation requested") in caplog.record_tuples

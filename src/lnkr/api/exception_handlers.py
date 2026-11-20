@@ -4,6 +4,7 @@ HTTP responses for domain errors.
 Copyright (C) 2026 "Daniel Mizsak" <daniel@mizsak.com>
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 from fastapi import status
@@ -14,6 +15,7 @@ from lnkr import exceptions
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
 
+logger = logging.getLogger(__name__)
 NO_STORE_HEADERS = {"Cache-Control": "no-store"}
 
 
@@ -47,6 +49,7 @@ async def _login_token_generation_failed_handler(
     _request: Request,
     error: exceptions.LoginTokenGenerationFailedError,
 ) -> JSONResponse:
+    logger.error("Login token generation attempts exhausted")
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={"detail": [{"msg": str(error), "type": "login_token_generation_failed"}]},
@@ -74,6 +77,7 @@ async def _refresh_token_generation_failed_handler(
     _request: Request,
     error: exceptions.RefreshTokenGenerationFailedError,
 ) -> JSONResponse:
+    logger.error("Refresh token generation attempts exhausted")
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={"detail": [{"msg": str(error), "type": "refresh_token_generation_failed"}]},
@@ -139,6 +143,7 @@ async def _slug_not_owned_by_user_handler(_request: Request, error: exceptions.S
 async def _random_slug_generation_failed_handler(
     _request: Request, error: exceptions.RandomSlugGenerationFailedError
 ) -> JSONResponse:
+    logger.error("Random slug generation attempts exhausted")
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={"detail": [{"msg": str(error), "type": "random_slug_generation_failed"}]},
