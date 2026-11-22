@@ -7,7 +7,7 @@
 
 ## Runtime and dependencies
 
-- Requires Python 3.14.
+- Requires Python 3.15.
 - PEP 758's `except A, B:` syntax is intentional. Do not flag or rewrite it.
 - Dependencies are managed with uv. Project dependencies and dependency groups use exact `==` pins.
   Add new dependencies with `uv add 'pkg==x.y.z'`.
@@ -28,7 +28,9 @@
 
 - Name tests `test_<operation>__<scenario_or_behavior>`, using existing terminology.
   Keep one scenario per test, but multiple actions are appropriate when testing a sequence.
-- Order tests for each function to follow its control flow, including validation and early exits before later operations.
+- Keep endpoint tests in dedicated files following the existing layout.
+- When a test module covers multiple functions, group tests in the same order as their definitions in the source module.
+  Within each group, follow the function's control flow, including validation and early exits before later operations.
   Preserve the existing order when the relative flow order is unclear.
 - Parametrize only cases sharing setup and assertions, without conditional logic or varying patch targets.
   Split cases when sharing assertions requires indirect logic.

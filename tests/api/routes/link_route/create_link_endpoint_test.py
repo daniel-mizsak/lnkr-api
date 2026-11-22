@@ -108,27 +108,6 @@ async def test_create_link__unknown_field(client: AsyncClient, slug: str, target
     assert error["type"] == "extra_forbidden"
 
 
-async def test_create_link__slug_already_exists(client: AsyncClient, slug: str, target_url: str) -> None:
-    create_link = mock.AsyncMock(side_effect=SlugAlreadyExistsError(slug))
-
-    with mock.patch.object(link_route, "create_link", create_link):
-        response = await client.post(
-            url=f"{application_settings.LINKS_PREFIX}",
-            json={"slug": slug, "target_url": target_url},
-        )
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-
-    data = response.json()
-    error = data["detail"][0]
-
-    assert error["input"] == slug
-    assert error["loc"] == ["body", "slug"]
-    assert error["msg"] == f"Slug '{slug}' already exists"
-    assert error["type"] == "slug_already_exists"
-    create_link.assert_awaited_once()
-
-
 async def test_create_link__user_does_not_exist(client: AsyncClient, user: User, slug: str, target_url: str) -> None:
     create_link = mock.AsyncMock(side_effect=UserDoesNotExistError.by_id(user.id))
 
@@ -171,6 +150,27 @@ async def test_create_link__user_link_limit_exceeded(
 
     assert error["msg"] == f"User '{user.email}' exceeds their link limit of {application_settings.USER_LINK_LIMIT}"
     assert error["type"] == "user_link_limit_exceeded"
+    create_link.assert_awaited_once()
+
+
+async def test_create_link__slug_already_exists(client: AsyncClient, slug: str, target_url: str) -> None:
+    create_link = mock.AsyncMock(side_effect=SlugAlreadyExistsError(slug))
+
+    with mock.patch.object(link_route, "create_link", create_link):
+        response = await client.post(
+            url=f"{application_settings.LINKS_PREFIX}",
+            json={"slug": slug, "target_url": target_url},
+        )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+    data = response.json()
+    error = data["detail"][0]
+
+    assert error["input"] == slug
+    assert error["loc"] == ["body", "slug"]
+    assert error["msg"] == f"Slug '{slug}' already exists"
+    assert error["type"] == "slug_already_exists"
     create_link.assert_awaited_once()
 
 
