@@ -50,7 +50,7 @@ def _is_retryable_smtp_error(error: OSError) -> bool:
     """Identify temporary SMTP responses and transient connection failures.
 
     SMTP reply classes: https://www.rfc-editor.org/rfc/rfc5321#section-4.2.1
-    Python exceptions: https://docs.python.org/3.14/library/smtplib.html#smtplib.SMTPException
+    Python exceptions: https://docs.python.org/3.15/library/smtplib.html#smtplib.SMTPException
     """
     match error:
         case smtplib.SMTPResponseException(smtp_code=code):

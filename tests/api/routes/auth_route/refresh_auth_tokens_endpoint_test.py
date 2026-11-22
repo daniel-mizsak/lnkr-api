@@ -128,7 +128,6 @@ async def test_refresh_auth_tokens__valid_refresh_token(
 
     assert set(data.keys()) == {"access_token", "refresh_token", "token_type"}
     assert access_token_payload.sub == str(user.id)
-    assert access_token_payload.type == "access"
     assert data["refresh_token"]
     assert data["refresh_token"] != original_refresh_token
     assert data["token_type"] == "bearer"  # noqa: S105

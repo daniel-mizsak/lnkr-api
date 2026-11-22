@@ -102,7 +102,6 @@ async def test_verify_login_token__valid_login_token(
 
     assert set(data.keys()) == {"access_token", "refresh_token", "token_type"}
     assert access_token_payload.sub == str(user.id)
-    assert access_token_payload.type == "access"
     assert data["refresh_token"]
     assert data["token_type"] == "bearer"  # noqa: S105
     assert ("lnkr.api.routes.auth_route", logging.INFO, f"Login succeeded for user {user.id}") in caplog.record_tuples

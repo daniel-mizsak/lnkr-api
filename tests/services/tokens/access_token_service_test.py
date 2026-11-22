@@ -41,21 +41,6 @@ def test_decode_access_token__invalid_signature(user_id: uuid.UUID, now: datetim
         decode_access_token(token)
 
 
-def test_decode_access_token__immediately_before_expiration(user_id: uuid.UUID) -> None:
-    expires_at = datetime(2026, 1, 1, 12, tzinfo=UTC)
-    token = jwt.encode(
-        {"sub": str(user_id), "iat": expires_at - timedelta(minutes=1), "exp": expires_at, "type": "access"},
-        key=application_settings.ACCESS_TOKEN_SECRET_KEY.get_secret_value(),
-        algorithm=application_settings.ACCESS_TOKEN_ALGORITHM,
-    )
-
-    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
-        payload = decode_access_token(token)
-
-    assert payload.sub == str(user_id)
-    assert payload.exp == expires_at
-
-
 @pytest.mark.parametrize(
     "elapsed",
     [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
@@ -82,3 +67,18 @@ def test_decode_access_token__wrong_token_type(user_id: uuid.UUID, now: datetime
 
     with pytest.raises(jwt.InvalidTokenError):
         decode_access_token(token)
+
+
+def test_decode_access_token__immediately_before_expiration(user_id: uuid.UUID) -> None:
+    expires_at = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    token = jwt.encode(
+        {"sub": str(user_id), "iat": expires_at - timedelta(minutes=1), "exp": expires_at, "type": "access"},
+        key=application_settings.ACCESS_TOKEN_SECRET_KEY.get_secret_value(),
+        algorithm=application_settings.ACCESS_TOKEN_ALGORITHM,
+    )
+
+    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
+        payload = decode_access_token(token)
+
+    assert payload.sub == str(user_id)
+    assert payload.exp == expires_at

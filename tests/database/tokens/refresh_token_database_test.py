@@ -44,6 +44,43 @@ async def test_consume_refresh_token__single_use(
     assert consumed_again is None
 
 
+@pytest.mark.parametrize(
+    "elapsed",
+    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
+)
+async def test_consume_refresh_token__expired_token(session: AsyncSession, user: User, elapsed: timedelta) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    token = RefreshToken(
+        user_id=user.id,
+        token_hash="a" * 64,
+        expires_at=expires_at,
+    )
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at + elapsed, tick=False):
+        consumed_token = await refresh_token_database.consume_refresh_token(session, token.token_hash)
+
+    assert consumed_token is None
+    await session.refresh(token)
+    assert token.used_at is None
+
+
+async def test_consume_refresh_token__immediately_before_expiration(
+    session: AsyncSession,
+    user: User,
+    expires_at: datetime,
+) -> None:
+    token = RefreshToken(user_id=user.id, token_hash="a" * 64, expires_at=expires_at)
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
+        consumed_token = await refresh_token_database.consume_refresh_token(session, token.token_hash)
+
+    assert consumed_token is token
+
+
 @pytest.mark.usefixtures("frozen_now")
 async def test_revoke_refresh_token__prevents_consumption(
     session: AsyncSession,
@@ -68,6 +105,43 @@ async def test_revoke_refresh_token__prevents_consumption(
     assert revoked.revoked_at == now
     assert revoked_again is None
     assert consumed is None
+
+
+@pytest.mark.parametrize(
+    "elapsed",
+    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
+)
+async def test_revoke_refresh_token__expired_token(session: AsyncSession, user: User, elapsed: timedelta) -> None:
+    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
+    token = RefreshToken(
+        user_id=user.id,
+        token_hash="a" * 64,
+        expires_at=expires_at,
+    )
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at + elapsed, tick=False):
+        revoked_token = await refresh_token_database.revoke_refresh_token(session, token.token_hash)
+
+    assert revoked_token is None
+    await session.refresh(token)
+    assert token.revoked_at is None
+
+
+async def test_revoke_refresh_token__immediately_before_expiration(
+    session: AsyncSession,
+    user: User,
+    expires_at: datetime,
+) -> None:
+    token = RefreshToken(user_id=user.id, token_hash="a" * 64, expires_at=expires_at)
+    session.add(token)
+    await session.commit()
+
+    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
+        revoked_token = await refresh_token_database.revoke_refresh_token(session, token.token_hash)
+
+    assert revoked_token is token
 
 
 @pytest.mark.parametrize(
@@ -106,77 +180,3 @@ async def test_clean_up_refresh_tokens__deletes_only_expired_used_or_revoked_tok
 
     await session.rollback()
     assert set((await session.scalars(select(RefreshToken.id))).all()) == token_ids
-
-
-async def test_consume_refresh_token__immediately_before_expiration(
-    session: AsyncSession,
-    user: User,
-    expires_at: datetime,
-) -> None:
-    token = RefreshToken(user_id=user.id, token_hash="a" * 64, expires_at=expires_at)
-    session.add(token)
-    await session.commit()
-
-    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
-        consumed_token = await refresh_token_database.consume_refresh_token(session, token.token_hash)
-
-    assert consumed_token is token
-
-
-@pytest.mark.parametrize(
-    "elapsed",
-    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
-)
-async def test_consume_refresh_token__expired_token(session: AsyncSession, user: User, elapsed: timedelta) -> None:
-    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
-    token = RefreshToken(
-        user_id=user.id,
-        token_hash="a" * 64,
-        expires_at=expires_at,
-    )
-    session.add(token)
-    await session.commit()
-
-    with time_machine.travel(expires_at + elapsed, tick=False):
-        consumed_token = await refresh_token_database.consume_refresh_token(session, token.token_hash)
-
-    assert consumed_token is None
-    await session.refresh(token)
-    assert token.used_at is None
-
-
-@pytest.mark.parametrize(
-    "elapsed",
-    [pytest.param(timedelta(0), id="at-expiration"), pytest.param(timedelta(microseconds=1), id="after-expiration")],
-)
-async def test_revoke_refresh_token__expired_token(session: AsyncSession, user: User, elapsed: timedelta) -> None:
-    expires_at = datetime(2026, 1, 1, tzinfo=UTC)
-    token = RefreshToken(
-        user_id=user.id,
-        token_hash="a" * 64,
-        expires_at=expires_at,
-    )
-    session.add(token)
-    await session.commit()
-
-    with time_machine.travel(expires_at + elapsed, tick=False):
-        revoked_token = await refresh_token_database.revoke_refresh_token(session, token.token_hash)
-
-    assert revoked_token is None
-    await session.refresh(token)
-    assert token.revoked_at is None
-
-
-async def test_revoke_refresh_token__immediately_before_expiration(
-    session: AsyncSession,
-    user: User,
-    expires_at: datetime,
-) -> None:
-    token = RefreshToken(user_id=user.id, token_hash="a" * 64, expires_at=expires_at)
-    session.add(token)
-    await session.commit()
-
-    with time_machine.travel(expires_at - timedelta(microseconds=1), tick=False):
-        revoked_token = await refresh_token_database.revoke_refresh_token(session, token.token_hash)
-
-    assert revoked_token is token

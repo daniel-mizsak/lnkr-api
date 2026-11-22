@@ -105,10 +105,12 @@ def mock_send_email_fixture() -> Generator[mock.AsyncMock]:
 @pytest.fixture(name="request_login_token")
 def request_login_token_fixture(client: AsyncClient, mock_send_email: mock.AsyncMock) -> RequestLoginTokenFunction:
     async def request_login_token(email: str) -> str:
-        await client.post(
+        response = await client.post(
             url=f"{application_settings.AUTH_PREFIX}/request-login-token",
             json={"email": email},
         )
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
         await_args = mock_send_email.await_args
         assert await_args is not None
         sent_email = await_args.args[0]

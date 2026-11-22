@@ -83,7 +83,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
 
   adminer:
-    image: adminer:5.4.2
+    image: adminer@sha256:037125c2bc4836b4917d4fd08a16f817eac2848778c4e9aab87a8340aef08dfd # 6.3.0
     container_name: adminer
     ports:
       - "8080:8080"
@@ -103,7 +103,7 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
 
   mailpit:
-    image: axllent/mailpit:v1.29.7
+    image: axllent/mailpit@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e # v1.34.0
     container_name: mailpit
     ports:
       - "8025:8025"

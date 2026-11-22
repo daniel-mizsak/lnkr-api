@@ -3,51 +3,51 @@
   name = "lnkr-api"
   version = "0.0.0"
   description = "Link manager REST API."
-  requires-python = ">=3.14"
+  requires-python = ">=3.15"
   authors = [{ name = "Daniel Mizsak", email = "daniel@mizsak.com" }]
   dependencies = [
-    "PyJWT==2.15.0",
-    "SQLAlchemy[asyncio]==2.1.6",
+    "PyJWT==2.15.1",
+    "SQLAlchemy[asyncio]==2.1.8",
     "alembic[tz]==1.20.1",
-    "anyio==4.15.1",
+    "anyio==4.16.0",
     "argon2-cffi==25.1.0",
-    "fastapi[standard]==0.162.0",
+    "fastapi[standard]==0.163.1",
     "geoip2==5.3.0",
     "httpx2==2.16.0",
-    "psycopg[binary]==3.3.6",
-    "pydantic-settings==2.16.1",
+    "psycopg[binary]==3.3.9",
+    "pydantic-settings==2.16.3",
     "redis==8.1.0",
     "segno==1.6.6",
-    "sentry-sdk==2.73.0",
+    "sentry-sdk==2.75.0",
     "ua-parser[regex]==1.0.2",
   ]
-
-  [project.scripts]
-    lnkr-cleanup = "lnkr.cleanup:main"
 
   [project.urls]
     Homepage = "https://api.lnkr.by"
     Repository = "https://github.com/daniel-mizsak/lnkr-api"
 
+  [project.scripts]
+    lnkr-cleanup = "lnkr.cleanup:main"
+
 [dependency-groups]
   dev = [
-    "ansible-lint==26.10.1",
+    "ansible-lint==26.11.0",
     "beautifulsoup4==4.15.0",
-    "coverage==7.17.0",
-    "prek==0.5.7",
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "coverage==7.17.3",
+    "prek==0.5.10",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
     "testcontainers[postgres]==4.15.0",
-    "time-machine==3.5.1",
-    "ty==0.0.91",
+    "time-machine==3.6.0",
+    "ty==0.0.104",
     { include-group = "lint" },
   ]
   deployment = [
-    "ansible==14.5.0",
-    "pulumi==3.272.0",
-    "pulumi-cloudflare==6.23.1",
+    "ansible==14.6.0",
+    "pulumi==3.276.0",
+    "pulumi-cloudflare==6.24.0",
   ]
-  lint = ["ruff==0.17.2"]
+  lint = ["ruff==0.17.5"]
 
 # Build System
 [build-system]
@@ -58,8 +58,11 @@
 # Pytest
 [tool.pytest.ini_options]
   addopts = "--import-mode=importlib"
+  strict_config = true
+  strict_markers = true
   testpaths = ["tests"]
   asyncio_mode = "auto"
+  asyncio_default_fixture_loop_scope = "function"
 
 # Uv
 [tool.uv]
