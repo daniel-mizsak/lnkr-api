@@ -14,8 +14,10 @@ from typing import TYPE_CHECKING, cast
 import pytest
 import time_machine
 from geoip2.errors import AddressNotFoundError
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
+from testcontainers.community.redis import RedisContainer
 
 from lnkr.config.application_settings import application_settings
 from lnkr.models import Link, LinkCache, LinkStatus, User
@@ -28,18 +30,23 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-@pytest.fixture(name="engine", scope="session")
-async def engine_fixture() -> AsyncGenerator[AsyncEngine]:
+@pytest.fixture(name="postgres_container", scope="session")
+def postgres_container_fixture() -> Iterator[PostgresContainer]:
     with PostgresContainer(str(os.getenv("POSTGRES_IMAGE")), driver="psycopg") as container:
-        engine = create_async_engine(
-            container.get_connection_url(),
-            # Disable prepared statements because recreating PostgreSQL enums between tests invalidates cached OIDs.
-            connect_args={"prepare_threshold": None},
-        )
-        try:
-            yield engine
-        finally:
-            await engine.dispose()
+        yield container
+
+
+@pytest.fixture(name="engine")
+async def engine_fixture(postgres_container: PostgresContainer) -> AsyncGenerator[AsyncEngine]:
+    engine = create_async_engine(
+        postgres_container.get_connection_url(),
+        # Disable prepared statements because recreating PostgreSQL enums between tests invalidates cached OIDs.
+        connect_args={"prepare_threshold": None},
+    )
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture(name="session")
@@ -52,6 +59,23 @@ async def session_fixture(engine: AsyncEngine, user: User, user_other: User) -> 
         session.add_all([user, user_other])
         await session.commit()
         yield session
+
+
+@pytest.fixture(name="redis_container", scope="session")
+def redis_container_fixture() -> Iterator[RedisContainer]:
+    with RedisContainer(str(os.getenv("REDIS_IMAGE"))) as container:
+        yield container
+
+
+@pytest.fixture(name="cache")
+async def cache_fixture(redis_container: RedisContainer) -> AsyncGenerator[Redis]:
+    async with Redis(
+        host=redis_container.get_container_host_ip(),
+        port=redis_container.get_exposed_port(redis_container.port),
+        decode_responses=True,
+    ) as cache:
+        await cache.flushdb()
+        yield cache
 
 
 @pytest.fixture(name="email")

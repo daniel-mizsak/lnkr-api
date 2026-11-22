@@ -96,18 +96,20 @@ def _generate_random_slug(random_slug_length: int) -> str:
 async def get_cached_link(session: AsyncSession, cache: Redis, slug: str) -> LinkCache:
     """Get a link from cache or database by its slug."""
     try:
-        cached_link = await link_cache.get_cached_link_by_slug(cache, slug)
+        cached_link, lease_token = await link_cache.get_cached_link_by_slug(cache, slug)
     except RedisError:
         logger.warning("Cache lookup failed for slug %r, falling back to the database", slug, exc_info=True)
         cached_link = None
+        lease_token = None
 
     if cached_link is None:
         link = await _get_link(session, slug)
         cached_link = LinkCache.from_link(link)
-        try:
-            await link_cache.add_cached_link(cache, cached_link)
-        except RedisError:
-            logger.warning("Cache write failed for slug %r", slug, exc_info=True)
+        if lease_token is not None:
+            try:
+                await link_cache.add_cached_link(cache, cached_link, lease_token)
+            except RedisError:
+                logger.warning("Cache write failed for slug %r", slug, exc_info=True)
 
     if cached_link.status == LinkStatus.DISABLED:
         raise LinkDisabledError(slug=cached_link.slug)

@@ -10,7 +10,6 @@ from unittest import mock
 
 import pytest
 from bs4 import BeautifulSoup
-from fakeredis import FakeAsyncRedis
 from fastapi import status
 from httpx2 import ASGITransport, AsyncClient
 
@@ -28,16 +27,20 @@ from lnkr.models import User
 
 if TYPE_CHECKING:
     from geoip2.database import Reader
+    from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture(name="client")
-async def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader) -> AsyncIterator[AsyncClient]:
-    fake_async_redis = FakeAsyncRedis(decode_responses=True)
-
+async def client_fixture(
+    session: AsyncSession,
+    user: User,
+    cache: Redis,
+    geoip_reader: Reader,
+) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_cache] = lambda: fake_async_redis
+    app.dependency_overrides[get_cache] = lambda: cache
     app.dependency_overrides[get_geoip_reader] = lambda: geoip_reader
     app.dependency_overrides[verify_frontend_api_key] = lambda: None
     transport = ASGITransport(app=app)
@@ -48,7 +51,6 @@ async def client_fixture(session: AsyncSession, user: User, geoip_reader: Reader
             yield client
     finally:
         app.dependency_overrides.clear()
-        await fake_async_redis.aclose()
 
 
 OverrideGetCurrentUserFunction = Callable[[User], None]

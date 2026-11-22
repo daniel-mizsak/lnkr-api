@@ -38,6 +38,11 @@ def link_create_fixture(slug: str, target_url: str) -> LinkCreate:
     return LinkCreate.model_validate({"slug": slug, "target_url": target_url})
 
 
+@pytest.fixture(name="lease_token")
+def lease_token_fixture() -> str:
+    return f"pending:{uuid.uuid4()}"
+
+
 async def test_create_link__user_does_not_exist(session: AsyncSession, link_create: LinkCreate, email: str) -> None:
     user_missing = User(id=uuid.uuid4(), email=f"missing_{email}")
 
@@ -113,24 +118,7 @@ async def test_generate_unused_random_slug__generation_attempts_exhausted(sessio
         await link_service.generate_unused_random_slug(session)
 
 
-async def test_get_cached_link__cache_hit_avoids_database(cached_link: LinkCache) -> None:
-    get_link = mock.AsyncMock()
-
-    with (
-        mock.patch.object(
-            link_service.link_cache,
-            "get_cached_link_by_slug",
-            mock.AsyncMock(return_value=cached_link),
-        ),
-        mock.patch.object(link_service, "_get_link", get_link),
-    ):
-        retrieved_link = await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), cached_link.slug)
-
-    assert retrieved_link is cached_link
-    get_link.assert_not_awaited()
-
-
-async def test_get_cached_link__cache_lookup_failure_loads_database_and_populates_cache(
+async def test_get_cached_link__cache_lookup_failure_skips_cache_fill(
     session: AsyncSession,
     link: Link,
     caplog: pytest.LogCaptureFixture,
@@ -140,7 +128,7 @@ async def test_get_cached_link__cache_lookup_failure_loads_database_and_populate
 
     cache_error = RedisError("cache failure")
     cache = mock.AsyncMock()
-    get_cached_link_by_slug = mock.AsyncMock(return_value=None, side_effect=cache_error)
+    get_cached_link_by_slug = mock.AsyncMock(side_effect=cache_error)
     add_cached_link = mock.AsyncMock()
 
     with (
@@ -150,7 +138,7 @@ async def test_get_cached_link__cache_lookup_failure_loads_database_and_populate
         retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
 
     assert retrieved_link == LinkCache.from_link(link)
-    add_cached_link.assert_awaited_once_with(cache, retrieved_link)
+    add_cached_link.assert_not_awaited()
     records = [
         record
         for record in caplog.records
@@ -163,15 +151,52 @@ async def test_get_cached_link__cache_lookup_failure_loads_database_and_populate
     assert records[0].exc_info[1] is cache_error
 
 
+async def test_get_cached_link__cache_hit_avoids_database(cached_link: LinkCache) -> None:
+    get_link = mock.AsyncMock()
+
+    with (
+        mock.patch.object(
+            link_service.link_cache,
+            "get_cached_link_by_slug",
+            mock.AsyncMock(return_value=(cached_link, None)),
+        ),
+        mock.patch.object(link_service, "_get_link", get_link),
+    ):
+        retrieved_link = await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), cached_link.slug)
+
+    assert retrieved_link is cached_link
+    get_link.assert_not_awaited()
+
+
+async def test_get_cached_link__cache_miss_without_lease_skips_cache_fill(session: AsyncSession, link: Link) -> None:
+    session.add(link)
+    await session.commit()
+
+    cache = mock.AsyncMock()
+    add_cached_link = mock.AsyncMock()
+
+    with (
+        mock.patch.object(
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=(None, None))
+        ),
+        mock.patch.object(link_service.link_cache, "add_cached_link", add_cached_link),
+    ):
+        retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
+
+    assert retrieved_link == LinkCache.from_link(link)
+    add_cached_link.assert_not_awaited()
+
+
 async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
     session: AsyncSession,
     link: Link,
+    lease_token: str,
 ) -> None:
     session.add(link)
     await session.commit()
 
     cache = mock.AsyncMock()
-    get_cached_link_by_slug = mock.AsyncMock(return_value=None)
+    get_cached_link_by_slug = mock.AsyncMock(return_value=(None, lease_token))
     add_cached_link = mock.AsyncMock()
 
     with (
@@ -181,12 +206,13 @@ async def test_get_cached_link__cache_miss_loads_database_and_populates_cache(
         retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
 
     assert retrieved_link == LinkCache.from_link(link)
-    add_cached_link.assert_awaited_once_with(cache, retrieved_link)
+    add_cached_link.assert_awaited_once_with(cache, retrieved_link, lease_token)
 
 
 async def test_get_cached_link__cache_write_failure_ignored(
     session: AsyncSession,
     link: Link,
+    lease_token: str,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     session.add(link)
@@ -196,7 +222,9 @@ async def test_get_cached_link__cache_write_failure_ignored(
     cache = mock.AsyncMock()
 
     with (
-        mock.patch.object(link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=None)),
+        mock.patch.object(
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=(None, lease_token))
+        ),
         mock.patch.object(link_service.link_cache, "add_cached_link", mock.AsyncMock(side_effect=cache_error)),
     ):
         retrieved_link = await link_service.get_cached_link(session, cache, link.slug)
@@ -221,7 +249,7 @@ async def test_get_cached_link__disabled_link(cached_link: LinkCache) -> None:
         mock.patch.object(
             link_service.link_cache,
             "get_cached_link_by_slug",
-            mock.AsyncMock(return_value=disabled_link),
+            mock.AsyncMock(return_value=(disabled_link, None)),
         ),
         pytest.raises(LinkDisabledError),
     ):
@@ -239,7 +267,7 @@ async def test_get_cached_link__expired_link(cached_link: LinkCache, elapsed: ti
     with (
         time_machine.travel(expires_at + elapsed, tick=False),
         mock.patch.object(
-            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=expired_link)
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=(expired_link, None))
         ),
         pytest.raises(LinkExpiredError),
     ):
@@ -253,7 +281,7 @@ async def test_get_cached_link__immediately_before_expiration(cached_link: LinkC
     with (
         time_machine.travel(expires_at - timedelta(microseconds=1), tick=False),
         mock.patch.object(
-            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=expiring_link)
+            link_service.link_cache, "get_cached_link_by_slug", mock.AsyncMock(return_value=(expiring_link, None))
         ),
     ):
         retrieved_link = await link_service.get_cached_link(mock.AsyncMock(), mock.AsyncMock(), expiring_link.slug)
